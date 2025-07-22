@@ -1,0 +1,22 @@
+@import "tailwindcss/base";
+@import "tailwindcss/components";
+@import "tailwindcss/utilities";
+
+/* This file is for your main application CSS */
+
+ .tree-line::before {
+    content: '';
+    display: block;
+    width: 2px;
+    background-color: #ccc;
+    position: flex;
+    top: -20px;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+
+  .tree-node {
+  min-width: 120px;
+  text-align: center;
+}
