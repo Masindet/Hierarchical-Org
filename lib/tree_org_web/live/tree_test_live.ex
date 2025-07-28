@@ -100,32 +100,44 @@ defmodule TreeOrgWeb.TreeTestLive do
 
   # component to render tree recursively
   def render_tree(assigns) do
+    children = assigns[:node].children || []
+    n = Enum.count(children)
+    x2s =
+      if n > 0 do
+        Enum.map(1..n, fn i ->
+          ((100 / (n + 1)) * i)
+        end)
+      else
+        []
+      end
+    assigns = Map.put(assigns, :children, children)
+    assigns = Map.put(assigns, :x2s, x2s)
     ~H"""
     <div class="flex flex-col items-center relative">
-      <div class="tree-node cursor-pointer px-4 py-4 border border-gray-300 bg-blue-100 text-sm rounded shadow-sm inline-block mb-3">
+      <div class="tree-node cursor-pointer px-4 py-4 border border-gray-300 bg-blue-100 text-sm rounded shadow-sm inline-block mb-3" id={"node-" <> (@node.name |> String.replace(" ", "-"))}>
         <%= @node.name %>
       </div>
 
-      <%= if @node.children != [] do %>
-        <!-- vertical line from parent to children -->
-        <div class="h-6 tree-line relative"></div>
-
-        <!-- horizontal connectors and children -->
-        <div class="flex justify-center space-x-4 relative">
-
-          <!-- Horizontal line connecting children -->
-          <div class="absolute top-4 w-full border-t-2 border-gray-30"></div>
-
-          <!-- Child nodes -->
-          <%= for child <- @node.children do %>
-            <div class="relative z-10">
+      <%= if @children != [] do %>
+        <div class="relative w-full flex justify-center items-start" style="height: 40px;">
+          <svg width="100%" height="40" style="position: absolute; left: 0; top: 0; pointer-events: none;">
+            <%= for {child, idx} <- Enum.with_index(@children) do %>
+              <line
+                x1="50%" y1="0"
+                x2={to_string(Enum.at(@x2s, idx)) <> "%"}
+                y2="40"
+                stroke="#a0aec0" stroke-width="2" />
+            <% end %>
+          </svg>
+        </div>
+        <div class="flex justify-center space-x-4 relative w-full">
+          <%= for child <- @children do %>
+            <div class="relative z-10 flex-1 flex justify-center">
               <.render_tree node={child} />
             </div>
           <% end %>
         </div>
-
       <% end %>
-
     </div>
     """
   end
