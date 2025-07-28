@@ -14,8 +14,8 @@ defmodule TreeOrg.Application do
       {Phoenix.PubSub, name: TreeOrg.PubSub},
       # Start the Finch HTTP client for sending emails
       {Finch, name: TreeOrg.Finch},
-      # Start a worker by calling: TreeOrg.Worker.start_link(arg)
-      # {TreeOrg.Worker, arg},
+      # Start the ETS storage server
+      TreeOrg.TreeStorageServer,
       # Start to serve requests, typically the last entry
       TreeOrgWeb.Endpoint
     ]

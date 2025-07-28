@@ -1,3 +1,13 @@
+<%= if live_flash(@flash, :info) do %>
+  <div class="mb-4 p-2 bg-green-200 text-green-800 rounded text-center">
+    <%= live_flash(@flash, :info) %>
+  </div>
+<% end %>
+<%= if live_flash(@flash, :error) do %>
+  <div class="mb-4 p-2 bg-red-200 text-red-800 rounded text-center">
+    <%= live_flash(@flash, :error) %>
+  </div>
+<% end %>
 <div class="min-h-screen flex flex-row justify-center w-full bg-white">
    <!--add user form & button -->
     <div class="bg-gray-100 w-1/3 px-4 py-2 rounded"> 
@@ -13,7 +23,11 @@
                 <h2 class="text-xl font-semibold mb-4">
                     Add New User
                 </h2>
-
+                <%= if @form_error do %>
+                    <div class="mb-4 p-2 bg-red-200 text-red-800 rounded">
+                        <%= @form_error %>
+                    </div>
+                <% end %>
                 <.form for={%{}} phx-submit="add_user" phx-change="update_form">
                     <div class="mb-4">
                         <label class="block text-gray-700 text-md font-semibold mb-2">
@@ -26,14 +40,7 @@
                             <label class="block text-gray-700 text-md font-semibold mb-2">
                                 Role
                             </label>
-                            <select name="user[role]" class="shadow border rounded w-full py-2 px-3 text-gray-900">
-                                <option>--Select Role--</option>
-                                <%= for option <- @dropdown_options do %>
-                                    <option value={option} selected={@form_data["role"] == option}>
-                                        <%= option %>
-                                    </option>
-                                <% end %>
-                            </select>
+                            <input type="text" name="user[role]" class="shadow border rounded w-full py-2 px-3 text-gray-900" value={@form_data["role"]} placeholder="Enter Role" />
                         </div>
 
                         <!--2. dropdown for reports to -->
@@ -41,11 +48,11 @@
                             <label class="block text-gray-700 text-md font-semibold mb-2">
                                 Reports To
                             </label>
-                            <select name="user[reports_to]" class="shadow border rounded w-full py-2 px-3 text-gray-900">
-                                <option>--Select--</option>
+                            <select name="user[reports_to]" class="shadow border rounded w-full py-2 px-3 text-gray-900" required>
+                                <option value="" disabled selected={@form_data["reports_to"] in [nil, "", "--Select--"]}>--Select--</option>
                                 <%= for option <- @dropdown_options do %>
-                                    <option value={option} selected={@form_data["reports_to"] == option}>
-                                        <%= option %>
+                                    <option value={option.value} selected={@form_data["reports_to"] == option.value}>
+                                        <%= option.display %>
                                     </option>
                                 <% end %>
                             </select>
@@ -64,18 +71,65 @@
                 </.form>
             </div>
         <% end %>
-    </div>    
+        
+        <!-- Edit form is only visible if @show_edit_form is true -->
+        <%= if @show_edit_form do %>
+            <div class="bg-gray-200 p-6 rounded shadow mt-4">
+                <h2 class="text-xl font-semibold mb-4">
+                    Edit User
+                </h2>
+                <%= if @form_error do %>
+                    <div class="mb-4 p-2 bg-red-200 text-red-800 rounded">
+                        <%= @form_error %>
+                    </div>
+                <% end %>
+                <.form for={%{}} phx-submit="update_node" phx-change="update_edit_form">
+                    <div class="mb-4">
+                        <label class="block text-gray-700 text-md font-semibold mb-2">
+                            Name
+                        </label>
+                        <input type="text" name="edit_user[name]" value={@edit_form_data["name"]} class="shadow border rounded w-full py-2 px-3 text-gray-700" />
+
+                        <div class="mb-4">
+                            <label class="block text-gray-700 text-md font-semibold mb-2">
+                                Role
+                            </label>
+                            <input type="text" name="edit_user[role]" class="shadow border rounded w-full py-2 px-3 text-gray-900" value={@edit_form_data["role"]} placeholder="Enter Role" />
+                        </div>
+
+                        <input type="hidden" name="edit_user[node_id]" value={@edit_form_data["node_id"]} />
+
+                        <div class="flex space-x-2">
+                            <button type="submit" class="bg-green-500 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded">
+                                Update User
+                            </button>
+                            <button type="button" phx-click="cancel_edit" class="bg-gray-500 hover:bg-gray-900 text-white font-semibold py-2 px-4 rounded">
+                                Cancel
+                            </button>
+                        </div>
+                    </div> 
+    
+                </.form>
+            </div>
+        <% end %>
+    </div>
 
     <div class="flex-1 px-6 py-2">
-        <h1 class="text-2xl font-bold mb-6 text-center">Organizational Chart</h1>
+        <h1 class="text-2xl font-bold mb-6 text-center">Organizational Chart (v<%= @tree_version %>)</h1>
+        
+        <!-- Debug info -->
+        <div class="mb-4 p-2 bg-gray-100 text-sm text-center">
+            Debug: <%= @debug_info %>
+        </div>
+        
+        <!-- Tree display - completely re-render on version change -->
         <div class="flex justify-center">
-            <!-- tree display -->
-            <.render_tree node={@tree} />
+            <%= if @tree_version do %>
+                <div id={"tree-v#{@tree_version}"}>
+                    <.render_tree node={@tree} />
+                </div>
+            <% end %>
         </div>
     </div>      
     
 </div>
-
-    
-        
-

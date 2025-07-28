@@ -42,6 +42,19 @@ liveSocket.connect()
 // >> liveSocket.disableLatencySim()
 window.liveSocket = liveSocket
 
+// Handle tree updates from LiveView
+window.addEventListener("phx:tree-updated", (e) => {
+  console.log("Tree updated event received:", e.detail);
+  // Force a DOM refresh by temporarily hiding and showing the container
+  const container = document.querySelector('[id^="org-chart-container"]');
+  if (container) {
+    container.style.display = 'none';
+    setTimeout(() => {
+      container.style.display = 'flex';
+    }, 10);
+  }
+});
+
 document.addEventListener("DOMContentLoaded", () => {
     const nodes = document.querySelectorAll(".tree-node");
     nodes.forEach(node => {
