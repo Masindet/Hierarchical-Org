@@ -9,7 +9,7 @@ defmodule TreeOrg.Application do
   def start(_type, _args) do
     children = [
       TreeOrgWeb.Telemetry,
-      #TreeOrg.Repo,
+      TreeOrg.Repo,
       {DNSCluster, query: Application.get_env(:tree_org, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: TreeOrg.PubSub},
       # Start the Finch HTTP client for sending emails

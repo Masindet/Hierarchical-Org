@@ -1,11 +1,11 @@
-<%= if live_flash(@flash, :info) do %>
+<%= if Phoenix.Flash.get(@flash, :info) do %>
   <div class="mb-4 p-2 bg-green-200 text-green-800 rounded text-center">
-    <%= live_flash(@flash, :info) %>
+    <%= Phoenix.Flash.get(@flash, :info) %>
   </div>
 <% end %>
-<%= if live_flash(@flash, :error) do %>
+<%= if Phoenix.Flash.get(@flash, :error) do %>
   <div class="mb-4 p-2 bg-red-200 text-red-800 rounded text-center">
-    <%= live_flash(@flash, :error) %>
+    <%= Phoenix.Flash.get(@flash, :error) %>
   </div>
 <% end %>
 <div class="min-h-screen flex flex-row justify-center w-full bg-white">
@@ -48,14 +48,18 @@
                             <label class="block text-gray-700 text-md font-semibold mb-2">
                                 Reports To
                             </label>
-                            <select name="user[reports_to]" class="shadow border rounded w-full py-2 px-3 text-gray-900" required>
-                                <option value="" disabled selected={@form_data["reports_to"] in [nil, "", "--Select--"]}>--Select--</option>
-                                <%= for option <- @dropdown_options do %>
-                                    <option value={option.value} selected={@form_data["reports_to"] == option.value}>
-                                        <%= option.display %>
-                                    </option>
-                                <% end %>
-                            </select>
+                            <%= if @dropdown_options == [] do %>
+                                <div class="p-2 bg-gray-100 text-gray-500 rounded">No existing users - this will be the first user</div>
+                            <% else %>
+                                <select name="user[reports_to]" class="shadow border rounded w-full py-2 px-3 text-gray-900" required>
+                                    <option value="" disabled selected={@form_data["reports_to"] in [nil, "", "--Select--"]}>--Select--</option>
+                                    <%= for option <- @dropdown_options do %>
+                                        <option value={option.value} selected={@form_data["reports_to"] == option.value}>
+                                            <%= option.display %>
+                                        </option>
+                                    <% end %>
+                                </select>
+                            <% end %>
                         </div>
 
                         <div class="flex space-x-2">
@@ -115,18 +119,25 @@
     </div>
 
     <div class="flex-1 px-6 py-2">
-        <h1 class="text-2xl font-bold mb-6 text-center">Organizational Chart (v<%= @tree_version %>)</h1>
+        <h1 class="text-2xl font-bold mb-6 text-center">Organizational Chart</h1>
         
-        <!-- Debug info -->
-        <div class="mb-4 p-2 bg-gray-100 text-sm text-center">
-            Debug: <%= @debug_info %>
-        </div>
         
         <!-- Tree display - completely re-render on version change -->
         <div class="flex justify-center">
             <%= if @tree_version do %>
                 <div id={"tree-v#{@tree_version}"}>
-                    <.render_tree node={@tree} />
+                    <%= if @tree do %>
+                        <.render_tree node={@tree} />
+                    <% else %>
+                        <div class="text-center p-8">
+                            <div class="text-gray-500 text-lg mb-4">
+                                No organizational chart yet
+                            </div>
+                            <div class="text-gray-400 text-sm">
+                                Add your first user to get started!
+                            </div>
+                        </div>
+                    <% end %>
                 </div>
             <% end %>
         </div>

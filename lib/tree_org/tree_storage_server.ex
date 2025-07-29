@@ -1,6 +1,6 @@
 defmodule TreeOrg.TreeStorageServer do
   use GenServer
-  
+
   @table_name :org_tree_storage
 
   def start_link(_opts) do
@@ -11,42 +11,28 @@ defmodule TreeOrg.TreeStorageServer do
   def init(_) do
     # Create ETS table
     :ets.new(@table_name, [:set, :public, :named_table])
-    
-    # Initialize with default tree structure
-    tree = %{
-      id: "ceo-1",
-      name: "CEO",
-      children: [
-        %{id: "cto-1", name: "CTO",
-          children: [
-            %{id: "dev-1", name: "Dev", children: [%{id: "dev-2", name: "Hammond", children: []}]},
-            %{id: "qa-1", name: "QA", children: []}
-          ]
-        },
-        %{id: "cfo-1", name: "CFO",
-          children: [
-            %{id: "exec-1", name: "Executive",
-              children: [
-                %{id: "chief-asst-1", name: "Chief Assistant", children: []}
-              ]
-            },
-            %{id: "accountant-1", name: "Accountant",
-              children: [
-                %{id: "cpa-officer-1", name: "CPA Officer",
-                  children: [
-                    %{id: "cpa-asst-1", name: "CPA Assistant", children: []}
-                  ]
-                }
-              ]
-            }
-          ]
-        }
-      ]
-    }
-    
+
+    # Load tree from database
+    tree = load_tree_from_database()
+
     :ets.insert(@table_name, {:tree, tree})
     :ets.insert(@table_name, {:version, 1})
-    
+
     {:ok, %{}}
+  end
+
+  defp load_tree_from_database do
+    alias TreeOrg.Repo
+    alias TreeOrg.TreeNode
+
+    # Fetch all tree nodes from database
+    nodes = Repo.all(TreeNode)
+
+    # Build tree structure from nodes
+    case TreeNode.build_tree_from_nodes(nodes) do
+      [root_node] -> root_node
+      [] -> nil  # Return nil instead of "Empty" node
+      _ -> %{id: nil, name: "Multiple Roots", children: []}
+    end
   end
 end

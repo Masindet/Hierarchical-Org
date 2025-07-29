@@ -3,7 +3,7 @@ import Config
 # Configure your database
 config :tree_org, TreeOrg.Repo,
   username: "postgres",
-  password: "postgres",
+  password: "H/-\\Mm018@",
   hostname: "localhost",
   database: "tree_org_dev",
   stacktrace: true,

@@ -35,43 +35,59 @@ defmodule TreeOrgWeb.TreeTestLive do
   end
 
   def handle_event("add_user", _params, socket) do
-    %{form_data: %{"name" => name, "role" => role, "reports_to" => reports_to}} = socket.assigns
+    form_data = socket.assigns.form_data
+    name = Map.get(form_data, "name", "")
+    role = Map.get(form_data, "role", "")
+    reports_to = Map.get(form_data, "reports_to", nil)
     tree = TreeStorage.get_tree()
 
     Logger.info("Attempting to add user with form_data: #{inspect(socket.assigns.form_data)}")
 
     # Basic validation
-    if reports_to in [nil, "", "--Select--"] or String.trim(name) == "" or String.trim(role) == "" do
-      Logger.error("Validation failed: All fields must be filled")
-      {:noreply, put_flash(socket, :error, "Please fill in all fields and select a valid 'Reports To' value.")}
+    if String.trim(name) == "" or String.trim(role) == "" do
+      Logger.error("Validation failed: Name and role must be filled")
+      {:noreply, put_flash(socket, :error, "Please fill in name and role fields.")}
     else
       # Create new node
       node_name = "#{role} - #{name}"
       node_id = "node-#{:os.system_time(:millisecond)}"
       new_node = %{id: node_id, name: node_name, children: []}
 
-      # Get the target parent ID (last in the comma-separated path)
-      parent_ids = String.split(reports_to, ",")
-      target_parent_id = List.last(parent_ids)
-
-      # Debug info
-      debug_info = "Adding #{node_name} to parent #{target_parent_id}"
-      Logger.info(debug_info)
-
-      # Insert the node
-      {updated_tree, success} = insert_child(tree, target_parent_id, new_node)
-
-      if success do
-        IO.inspect(updated_tree, label: "Updated Tree")
-
-        # Update tree in ETS and broadcast
-        TreeStorage.update_tree(updated_tree)
-        # Do NOT update assigns here! Let handle_info/2 do it.
-        {:noreply, put_flash(socket, :info, "User added successfully!")}
+      # If tree is nil (empty), create the first node as root
+      if tree == nil do
+        Logger.info("Creating first node as root: #{node_name}")
+        TreeStorage.update_tree(new_node)
+        {:noreply, put_flash(socket, :info, "First user added successfully!")}
       else
-        Logger.error("Node insertion failed. Parent node with id #{target_parent_id} not found")
-        socket = assign(socket, :debug_info, "#{debug_info} - FAILED")
-        {:noreply, put_flash(socket, :error, "Failed to find the parent node. Please try again.")}
+        # Check if reports_to is valid for existing tree
+        if reports_to in [nil, "", "--Select--"] do
+          Logger.error("Validation failed: Must select a valid 'Reports To' value")
+          {:noreply, put_flash(socket, :error, "Please select a valid 'Reports To' value.")}
+        else
+          # Get the target parent ID (last in the comma-separated path)
+          parent_ids = String.split(reports_to, ",")
+          target_parent_id = List.last(parent_ids)
+
+          # Debug info
+          debug_info = "Adding #{node_name} to parent #{target_parent_id}"
+          Logger.info(debug_info)
+
+          # Insert the node
+          {updated_tree, success} = insert_child(tree, target_parent_id, new_node)
+
+          if success do
+            IO.inspect(updated_tree, label: "Updated Tree")
+
+            # Update tree in ETS and broadcast
+            TreeStorage.update_tree(updated_tree)
+            # Do NOT update assigns here! Let handle_info/2 do it.
+            {:noreply, put_flash(socket, :info, "User added successfully!")}
+          else
+            Logger.error("Node insertion failed. Parent node with id #{target_parent_id} not found")
+            socket = assign(socket, :debug_info, "#{debug_info} - FAILED")
+            {:noreply, put_flash(socket, :error, "Failed to find the parent node. Please try again.")}
+          end
+        end
       end
     end
   end
@@ -150,7 +166,7 @@ defmodule TreeOrgWeb.TreeTestLive do
   def handle_info(:tree_updated, socket) do
     Logger.info("[LiveView] Received :tree_updated in handle_info")
     # Force a full page reload on the client
-    {:noreply, push_navigate(socket, to: socket.assigns[:live_action] && Routes.live_path(socket, socket.assigns[:live_action]) || "/")}
+    {:noreply, push_navigate(socket, to: "/")}
   end
 
   # Simple recursive insert that returns {tree, success_boolean}
@@ -212,6 +228,7 @@ defmodule TreeOrgWeb.TreeTestLive do
   end
   defp delete_node(node, _target_id), do: node
 
+  defp extract_paths(nil, _id_path, _name_path), do: []
   defp extract_paths(node, id_path \\ [], name_path \\ []) do
     current_id_path = id_path ++ [node.id]
     current_name_path = name_path ++ [node.name]
@@ -249,19 +266,7 @@ defmodule TreeOrgWeb.TreeTestLive do
     Enum.at(colors, hash)
   end
 
-  # Alternative version using the node's position in hierarchy for more predictable colors
-  defp get_avatar_color_by_level(node_id, level \\ 0) do
-    level_colors = [
-      "bg-blue-600",      # Level 0 (CEO)
-      "bg-green-500",     # Level 1 (VPs)
-      "bg-purple-500",    # Level 2 (Directors)
-      "bg-pink-500",      # Level 3 (Managers)
-      "bg-indigo-500",    # Level 4 (Team Leads)
-      "bg-teal-500"       # Level 5+ (Individual Contributors)
-    ]
 
-    Enum.at(level_colors, min(level, length(level_colors) - 1))
-  end
 
   def render_tree(assigns) do
     children = assigns[:node].children || []
