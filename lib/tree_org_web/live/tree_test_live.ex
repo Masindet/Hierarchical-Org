@@ -34,7 +34,6 @@ defmodule TreeOrgWeb.TreeTestLive do
     {:noreply, assign(socket, :form_data, form_data)}
   end
 
-  # Add user event handler
   def handle_event("add_user", _params, socket) do
     %{form_data: %{"name" => name, "role" => role, "reports_to" => reports_to}} = socket.assigns
     tree = TreeStorage.get_tree()
@@ -77,36 +76,6 @@ defmodule TreeOrgWeb.TreeTestLive do
     end
   end
 
-  # Simple recursive insert that returns {tree, success_boolean}
-  # Base case: The current node is the target parent.
-# Add the new child to its children list.
-defp insert_child(%{id: id, children: children} = node, target_id, new_child) when id == target_id do
-  Logger.debug("Found target parent with id #{id}. Adding new child.")
-  updated_node = %{node | children: (children || []) ++ [new_child]}
-  {updated_node, true}
-end
-
-# Recursive step: The target is not this node, so search in its children.
-defp insert_child(%{children: children} = node, target_id, new_child) when is_list(children) do
-  # We need to track if an update has happened anywhere in the children.
-  # We'll use map_reduce to both transform the children list and track success.
-  {updated_children, overall_success} =
-    Enum.map_reduce(children, false, fn child, success_acc ->
-      {updated_child, success} = insert_child(child, target_id, new_child)
-      # If this branch was successful, the whole operation is successful.
-      {updated_child, success or success_acc}
-    end)
-
-  # Return the node with its potentially updated children and the success status.
-  {%{node | children: updated_children}, overall_success}
-end
-
-# Base case: The node has no children and is not the target.
-defp insert_child(node, _target_id, _new_child) do
-  {node, false} # Return the node unchanged.
-end
-
-  # Handle edit node event
   def handle_event("edit_node", %{"node_id" => node_id}, socket) do
     tree = TreeStorage.get_tree()
     node = find_node_by_id(tree, node_id)
@@ -184,6 +153,35 @@ end
     {:noreply, push_navigate(socket, to: socket.assigns[:live_action] && Routes.live_path(socket, socket.assigns[:live_action]) || "/")}
   end
 
+  # Simple recursive insert that returns {tree, success_boolean}
+  # Base case: The current node is the target parent.
+  # Add the new child to its children list.
+  defp insert_child(%{id: id, children: children} = node, target_id, new_child) when id == target_id do
+    Logger.debug("Found target parent with id #{id}. Adding new child.")
+    updated_node = %{node | children: (children || []) ++ [new_child]}
+    {updated_node, true}
+  end
+
+  # Recursive step: The target is not this node, so search in its children.
+  defp insert_child(%{children: children} = node, target_id, new_child) when is_list(children) do
+    # We need to track if an update has happened anywhere in the children.
+    # We'll use map_reduce to both transform the children list and track success.
+    {updated_children, overall_success} =
+      Enum.map_reduce(children, false, fn child, success_acc ->
+        {updated_child, success} = insert_child(child, target_id, new_child)
+        # If this branch was successful, the whole operation is successful.
+        {updated_child, success or success_acc}
+      end)
+
+    # Return the node with its potentially updated children and the success status.
+    {%{node | children: updated_children}, overall_success}
+  end
+
+  # Base case: The node has no children and is not the target.
+  defp insert_child(node, _target_id, _new_child) do
+    {node, false} # Return the node unchanged.
+  end
+
   # Helper functions
   defp find_node_by_id(%{id: id} = node, target_id) when id == target_id, do: node
   defp find_node_by_id(%{children: children}, target_id) when is_list(children) do
@@ -224,6 +222,47 @@ end
     paths ++ child_paths
   end
 
+  # Add this helper function to your LiveView module or create a separate helper module
+  defp get_avatar_color(node_id) do
+    # Define a list of attractive background colors
+    colors = [
+      "bg-blue-500",
+      "bg-green-500",
+      "bg-purple-500",
+      "bg-pink-500",
+      "bg-indigo-500",
+      "bg-red-500",
+      "bg-yellow-500",
+      "bg-teal-500",
+      "bg-orange-500",
+      "bg-cyan-500",
+      "bg-lime-500",
+      "bg-rose-500",
+      "bg-emerald-500",
+      "bg-violet-500",
+      "bg-amber-500",
+      "bg-sky-500"
+    ]
+
+    # Create a hash from the node_id and use it to select a color
+    hash = :erlang.phash2(node_id, length(colors))
+    Enum.at(colors, hash)
+  end
+
+  # Alternative version using the node's position in hierarchy for more predictable colors
+  defp get_avatar_color_by_level(node_id, level \\ 0) do
+    level_colors = [
+      "bg-blue-600",      # Level 0 (CEO)
+      "bg-green-500",     # Level 1 (VPs)
+      "bg-purple-500",    # Level 2 (Directors)
+      "bg-pink-500",      # Level 3 (Managers)
+      "bg-indigo-500",    # Level 4 (Team Leads)
+      "bg-teal-500"       # Level 5+ (Individual Contributors)
+    ]
+
+    Enum.at(level_colors, min(level, length(level_colors) - 1))
+  end
+
   def render_tree(assigns) do
     children = assigns[:node].children || []
     n = Enum.count(children)
@@ -242,8 +281,12 @@ end
     ~H"""
     <div class="flex flex-col items-center relative">
       <div class="relative group">
-        <div class="tree-node cursor-pointer px-4 py-4 border border-gray-300 bg-blue-100 text-sm rounded shadow-sm inline-block mb-3">
-          <%= @node.name %>
+        <div class="tree-node cursor-pointer px-4 py-4 border border-gray-300 bg-blue-100 text-sm rounded shadow-sm inline-block mb-3 flex items-center space-x-3">
+          <!-- Avatar with different colors based on node ID -->
+          <div class={"w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-lg #{get_avatar_color(@node.id)}"}>
+            <%= String.first(@node.name) |> String.upcase() %>
+          </div>
+          <span><%= @node.name %></span>
         </div>
 
         <div class="absolute top-0 right-0 transform translate-x-full -translate-y-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex space-x-1">
