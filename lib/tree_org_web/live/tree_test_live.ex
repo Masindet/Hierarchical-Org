@@ -4,6 +4,9 @@ defmodule TreeOrgWeb.TreeTestLive do
   require Logger
   require Phoenix.PubSub
 
+  # Position data structure for tree nodes
+  defstruct [:node, :x_position, :width, :children, :level]
+
   def mount(_params, _session, socket) do
     if connected?(socket), do: Phoenix.PubSub.subscribe(TreeOrg.PubSub, "tree_updates")
     tree = TreeStorage.get_tree()
@@ -283,8 +286,6 @@ defmodule TreeOrgWeb.TreeTestLive do
     end
   end
 
-
-
   defp find_parent_of_group(node, group_id) do
     # Check if the current node is the parent of the group.
     {leaf_nodes, _non_leaf_nodes} = Enum.split_with(node.children || [], &is_leaf?/1)
@@ -304,123 +305,218 @@ defmodule TreeOrgWeb.TreeTestLive do
     end)
   end
 
-  def render_tree(assigns) do
-    children = assigns[:node].children || []
+  # Calculate bottom-up positioning for the entire tree
+  defp calculate_tree_positions(node, level \\ 0) do
+    children = node.children || []
     {leaf_nodes, non_leaf_nodes} = group_leaf_nodes(children)
     all_children = leaf_nodes ++ non_leaf_nodes
 
-    n = Enum.count(all_children)
+    if Enum.empty?(all_children) do
+      # Leaf node - minimal width
+      %__MODULE__{
+        node: node,
+        x_position: 0,
+        width: 300,  # Base width for leaf nodes
+        children: [],
+        level: level
+      }
+    else
+      # Calculate positions for children first (bottom-up)
+      child_positions = Enum.map(all_children, &calculate_tree_positions(&1, level + 1))
 
-    # Calculate positions with better spacing for visual appeal
-    positions =
-      if n > 0 do
-        if n == 1 do
-          [50.0]  # Center single child
-        else
-          # Use wider distribution for better visual spacing
-          padding = 5.0  # Reduced padding for more space usage
-          available_width = 100.0 - (2 * padding)
-          step = available_width / (n - 1)
-          Enum.map(0..(n-1), fn i ->
-            padding + (step * i)
-          end)
-        end
-      else
-        []
-      end
+      # Calculate total width needed for all children
+      min_spacing = 50  # Minimum gap between nodes
+      total_children_width = Enum.reduce(child_positions, 0, fn child, acc ->
+        acc + child.width
+      end)
 
-    # Calculate minimum width based on number of children for better spacing
-    min_width = case n do
-      0 -> "auto"
-      1 -> "300px"
-      2 -> "600px"
-      3 -> "900px"
-      4 -> "1200px"
-      _ -> "#{n * 280}px"  # Dynamic width based on children count
+      # Add spacing between children
+      spacing_width = (length(child_positions) - 1) * min_spacing
+      required_width = max(300, total_children_width + spacing_width)
+
+      # Position children relative to their parent's center
+      {positioned_children, _} = Enum.map_reduce(child_positions, -required_width / 2, fn child, current_x ->
+        positioned_child = %{child | x_position: current_x + child.width / 2}
+        {positioned_child, current_x + child.width + min_spacing}
+      end)
+
+      %__MODULE__{
+        node: node,
+        x_position: 0,  # Parent is always centered
+        width: required_width,
+        children: positioned_children,
+        level: level
+      }
+    end
+  end
+
+  # Collect all nodes with their final positions for rendering
+  defp collect_positioned_nodes(tree_pos, offset_x \\ 0) do
+    current_node = %{
+      node: tree_pos.node,
+      x: offset_x + tree_pos.x_position,
+      level: tree_pos.level
+    }
+
+    child_nodes = Enum.flat_map(tree_pos.children, fn child ->
+      collect_positioned_nodes(child, offset_x + tree_pos.x_position)
+    end)
+
+    [current_node | child_nodes]
+  end
+
+  # Generate SVG lines connecting parent to children
+  defp generate_connection_lines(tree_pos, offset_x \\ 0, parent_x \\ nil, parent_level \\ nil) do
+    current_x = offset_x + tree_pos.x_position
+    current_level = tree_pos.level
+
+    # Lines from parent to current node (if not root)
+    parent_lines = if parent_x && parent_level do
+      parent_y = parent_level * 150 + 75  # 150px per level + node center offset
+      current_y = current_level * 150 + 75
+
+      [{parent_x, parent_y, current_x, current_y}]
+    else
+      []
     end
 
+    # Lines from current node to children
+    child_lines = Enum.flat_map(tree_pos.children, fn child ->
+      generate_connection_lines(child, offset_x + tree_pos.x_position, current_x, current_level)
+    end)
+
+    parent_lines ++ child_lines
+  end
+
+  def render_tree(assigns) do
+    # Calculate positions using bottom-up algorithm
+    tree_positions = calculate_tree_positions(assigns[:node])
+
+    # Collect all positioned nodes
+    positioned_nodes = collect_positioned_nodes(tree_positions)
+
+    # Generate connection lines
+    connection_lines = generate_connection_lines(tree_positions)
+
+    # Calculate bounds for the SVG container
+    min_x = if Enum.empty?(positioned_nodes) do
+      0
+    else
+      Enum.min_by(positioned_nodes, & &1.x).x - 150
+    end
+
+    max_x = if Enum.empty?(positioned_nodes) do
+      300
+    else
+      Enum.max_by(positioned_nodes, & &1.x).x + 150
+    end
+
+    max_level = if Enum.empty?(positioned_nodes) do
+      0
+    else
+      Enum.max_by(positioned_nodes, & &1.level).level
+    end
+
+    container_width = max_x - min_x + 300
+    container_height = (max_level + 1) * 150 + 100
+
+    # Group nodes by level for easier rendering
+    nodes_by_level = Enum.group_by(positioned_nodes, & &1.level)
+
     assigns = assigns
-    |> Map.put(:children, all_children)
-    |> Map.put(:positions, positions)
-    |> Map.put(:min_width, min_width)
+    |> Map.put(:positioned_nodes, positioned_nodes)
+    |> Map.put(:connection_lines, connection_lines)
+    |> Map.put(:container_width, container_width)
+    |> Map.put(:container_height, container_height)
+    |> Map.put(:min_x, min_x)
+    |> Map.put(:nodes_by_level, nodes_by_level)
+    |> Map.put(:max_level, max_level)
 
     ~H"""
-    <div class="flex flex-col items-center relative" style={"min-width: #{@min_width};"}>
-      <div class="relative group mb-8">
-        <div class="tree-node cursor-pointer px-8 py-6 border-2 border-gray-200 bg-gradient-to-br from-blue-50 to-blue-100 hover:from-blue-100 hover:to-blue-150 text-base rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 inline-block flex items-center space-x-4 min-w-[280px]">
-          <div class={"w-14 h-14 rounded-full flex items-center justify-center text-white font-bold text-xl shadow-md #{get_avatar_color(@node.id)}"}>
-            <%= String.first(@node.name) |> String.upcase() %>
-          </div>
-          <div class="flex-1">
-            <div class="font-semibold text-gray-800 text-lg"><%= @node.name %></div>
-          </div>
-        </div>
-
-        <div class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex space-x-2">
-          <%= if @node.id != "ceo-1" do %>
-            <button
-              phx-click="edit_node"
-              phx-value-node_id={@node.id}
-              class="bg-amber-500 hover:bg-amber-600 text-white text-sm px-3 py-2 rounded-full shadow-md transition-colors duration-200"
-              title="Edit"
-            >
-              ✏️
-            </button>
-            <button
-              phx-click="delete_node"
-              phx-value-node_id={@node.id}
-              class="bg-red-500 hover:bg-red-600 text-white text-sm px-3 py-2 rounded-full shadow-md transition-colors duration-200"
-              title="Delete"
-              onclick="return confirm('Are you sure you want to delete this node?')"
-            >
-              🗑️
-            </button>
+    <div class="flex flex-col items-center relative w-full overflow-x-auto">
+      <div class="relative" style={"width: #{@container_width}px; height: #{@container_height}px;"}>
+        <!-- SVG for connection lines -->
+        <svg
+          class="absolute top-0 left-0 pointer-events-none z-10"
+          width={@container_width}
+          height={@container_height}
+        >
+          <%= for {x1, y1, x2, y2} <- @connection_lines do %>
+            <line
+              x1={x1 - @min_x + 150}
+              y1={y1}
+              x2={x2 - @min_x + 150}
+              y2={y2}
+              stroke="#6366f1"
+              stroke-width="3"
+              opacity="0.7"
+            />
           <% end %>
-        </div>
-      </div>
+        </svg>
 
-      <%= if @children != [] do %>
-        <div class="relative w-full flex justify-center items-start" style="height: 80px;">
-          <svg width="100%" height="80" style="position: absolute; left: 0; top: 0; pointer-events: none;">
-            <%= for {_child, idx} <- Enum.with_index(@children) do %>
-              <line
-                x1="50%" y1="0"
-                x2={to_string(Enum.at(@positions, idx)) <> "%"}
-                y2="80"
-                stroke="#6366f1" stroke-width="3" opacity="0.7" />
-            <% end %>
-          </svg>
-        </div>
-
-        <!-- Use relative positioning container with absolute positioned children -->
-        <div class="relative w-full" style="min-height: 400px;">
-          <%= for {child, idx} <- Enum.with_index(@children) do %>
-            <div class="absolute" style={"left: #{Enum.at(@positions, idx)}%; transform: translateX(-50%); top: 0;"}>
-              <%= if Map.get(child, :is_group, false) do %>
+        <!-- Render nodes at their calculated positions -->
+        <%= for {level, nodes} <- @nodes_by_level do %>
+          <%= for positioned_node <- nodes do %>
+            <div
+              class="absolute z-20"
+              style={"left: #{positioned_node.x - @min_x + 150}px; top: #{level * 150}px; transform: translateX(-50%);"}
+            >
+              <%= if Map.get(positioned_node.node, :is_group, false) do %>
                 <div class="flex flex-col items-center relative">
                   <div class="relative group">
                     <button
                       phx-click="show_group_members"
-                      phx-value-group_id={child.id}
+                      phx-value-group_id={positioned_node.node.id}
                       class="tree-node cursor-pointer px-8 py-6 border-2 border-green-200 bg-gradient-to-br from-green-50 to-green-100 hover:from-green-100 hover:to-green-150 text-base rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 inline-block flex items-center space-x-4 min-w-[280px]"
                     >
                       <div class="w-14 h-14 rounded-full flex items-center justify-center text-white font-bold text-xl bg-green-500 shadow-md">
                         👥
                       </div>
                       <div class="flex-1">
-                        <div class="font-semibold text-gray-800 text-lg"><%= child.name %></div>
+                        <div class="font-semibold text-gray-800 text-lg"><%= positioned_node.node.name %></div>
                         <div class="text-sm text-gray-600">Click to view members</div>
                       </div>
                     </button>
                   </div>
                 </div>
               <% else %>
-                <.render_tree node={child} />
+                <div class="relative group">
+                  <div class="tree-node cursor-pointer px-8 py-6 border-2 border-gray-200 bg-gradient-to-br from-blue-50 to-blue-100 hover:from-blue-100 hover:to-blue-150 text-base rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 inline-block flex items-center space-x-4 min-w-[280px]">
+                    <div class={"w-14 h-14 rounded-full flex items-center justify-center text-white font-bold text-xl shadow-md #{get_avatar_color(positioned_node.node.id)}"}>
+                      <%= String.first(positioned_node.node.name) |> String.upcase() %>
+                    </div>
+                    <div class="flex-1">
+                      <div class="font-semibold text-gray-800 text-lg"><%= positioned_node.node.name %></div>
+                    </div>
+                  </div>
+
+                  <div class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex space-x-2">
+                    <%= if positioned_node.node.id != "ceo-1" do %>
+                      <button
+                        phx-click="edit_node"
+                        phx-value-node_id={positioned_node.node.id}
+                        class="bg-amber-500 hover:bg-amber-600 text-white text-sm px-3 py-2 rounded-full shadow-md transition-colors duration-200"
+                        title="Edit"
+                      >
+                        ✏️
+                      </button>
+                      <button
+                        phx-click="delete_node"
+                        phx-value-node_id={positioned_node.node.id}
+                        class="bg-red-500 hover:bg-red-600 text-white text-sm px-3 py-2 rounded-full shadow-md transition-colors duration-200"
+                        title="Delete"
+                        onclick="return confirm('Are you sure you want to delete this node?')"
+                      >
+                        🗑️
+                      </button>
+                    <% end %>
+                  </div>
+                </div>
               <% end %>
             </div>
           <% end %>
-        </div>
-      <% end %>
+        <% end %>
+      </div>
     </div>
     """
   end
