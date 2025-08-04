@@ -36,6 +36,7 @@ defmodule TreeOrg.TreeNode do
     %{
       id: node.id,
       name: node.name,
+      parent_id: node.parent_id,
       children: Enum.map(children, fn child ->
         build_node_with_children(child, nodes_by_parent)
       end)

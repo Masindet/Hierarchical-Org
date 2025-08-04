@@ -1,146 +1,245 @@
 <%= if Phoenix.Flash.get(@flash, :info) do %>
-  <div class="mb-4 p-2 bg-green-200 text-green-800 rounded text-center">
-    <%= Phoenix.Flash.get(@flash, :info) %>
+  <div class="mb-4 p-4 bg-emerald-100 border border-emerald-200 text-emerald-800 rounded-lg text-center shadow-sm">
+    <div class="flex items-center justify-center space-x-2">
+      <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+      </svg>
+      <span><%= Phoenix.Flash.get(@flash, :info) %></span>
+    </div>
   </div>
 <% end %>
+
 <%= if Phoenix.Flash.get(@flash, :error) do %>
-  <div class="mb-4 p-2 bg-red-200 text-red-800 rounded text-center">
-    <%= Phoenix.Flash.get(@flash, :error) %>
+  <div class="mb-4 p-4 bg-red-100 border border-red-200 text-red-800 rounded-lg text-center shadow-sm">
+    <div class="flex items-center justify-center space-x-2">
+      <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+      </svg>
+      <span><%= Phoenix.Flash.get(@flash, :error) %></span>
+    </div>
   </div>
 <% end %>
-<div class="min-h-screen flex flex-row justify-center w-full bg-white">
-   <!--add user form & button -->
-    <div class="bg-gray-100 w-1/3 px-4 py-2 rounded"> 
-        <div class="text-center mb-4">
-            <button phx-click="toggle_form" class="bg-blue-400 hover:bg-blue-700 text-white px-4 py-2 rounded">
-                Add User
-            </button>
+
+<!-- Group Members Modal -->
+<%= if @show_group_modal do %>
+  <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" phx-click="close_group_modal">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[80vh] overflow-y-auto" onclick="event.stopPropagation()">
+      <div class="p-6 border-b border-gray-200">
+        <div class="flex items-center justify-between">
+          <h2 class="text-2xl font-bold text-gray-800 flex items-center space-x-3">
+            <div class="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-lg bg-green-500 shadow-md">
+              👥
+            </div>
+            <span><%= @group_title %></span>
+          </h2>
+          <button phx-click="close_group_modal" class="text-gray-400 hover:text-gray-600 transition-colors duration-200">
+            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
         </div>
-        
-        <!--form is only visible if @show_form is true -->
+      </div>
+
+      <div class="p-6">
+        <%= if @group_members != [] do %>
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            <%= for member <- @group_members do %>
+              <div class="bg-gradient-to-br from-gray-50 to-gray-100 border-2 border-gray-200 rounded-xl p-4 hover:shadow-lg transition-all duration-300 hover:scale-105">
+                <div class="flex items-center space-x-3">
+                  <div class={"w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-md #{TreeOrgWeb.TreeTestLive.get_avatar_color(member.id)}"}>
+                    <%= String.first(member.name) |> String.upcase() %>
+                  </div>
+                  <div class="flex-1 min-w-0">
+                    <div class="font-semibold text-gray-800 truncate"><%= member.name %></div>
+                  </div>
+                </div>
+
+                <div class="mt-3 flex space-x-2">
+                  <button
+                    phx-click="edit_node"
+                    phx-value-node_id={member.id}
+                    class="flex-1 bg-amber-500 hover:bg-amber-600 text-white font-medium py-2 px-3 rounded-lg text-sm transition-colors duration-200 flex items-center justify-center space-x-1"
+                  >
+                    <span>✏️</span>
+                    <span>Edit</span>
+                  </button>
+                  <button
+                    phx-click="delete_node"
+                    phx-value-node_id={member.id}
+                    class="flex-1 bg-red-500 hover:bg-red-600 text-white font-medium py-2 px-3 rounded-lg text-sm transition-colors duration-200 flex items-center justify-center space-x-1"
+                    onclick="return confirm('Are you sure you want to delete this member?')"
+                  >
+                    <span>🗑️</span>
+                    <span>Delete</span>
+                  </button>
+                </div>
+              </div>
+            <% end %>
+          </div>
+        <% else %>
+          <div class="text-center py-12">
+            <div class="text-gray-400 text-lg mb-2">No members found</div>
+            <div class="text-gray-500 text-sm">This group appears to be empty</div>
+          </div>
+        <% end %>
+      </div>
+
+      <div class="p-6 border-t border-gray-200 bg-gray-50 rounded-b-2xl">
+        <div class="flex justify-center">
+          <button phx-click="close_group_modal" class="bg-gray-600 hover:bg-gray-700 text-white font-semibold px-8 py-3 rounded-xl shadow-md transition-colors duration-200">
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+<% end %>
+
+<div class="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
+  <div class="flex flex-col lg:flex-row w-full">
+    <!-- Sidebar -->
+    <div class="bg-white shadow-xl lg:w-1/3 xl:w-1/4 border-r border-gray-200">
+      <div class="p-6 border-b border-gray-100">
+        <h2 class="text-xl font-bold text-gray-800 mb-4">Organization Management</h2>
+        <button phx-click="toggle_form" class="w-full bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white font-semibold px-6 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105">
+          <div class="flex items-center justify-center space-x-2">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+            </svg>
+            <span>Add New User</span>
+          </div>
+        </button>
+      </div>
+
+      <div class="p-6 overflow-y-auto" style="max-height: calc(100vh - 140px);">
+        <!-- Add User Form -->
         <%= if @show_form do %>
-            <div class="bg-gray-200 p-6 rounded shadow">
-                <h2 class="text-xl font-semibold mb-4">
-                    Add New User
-                </h2>
-                <%= if @form_error do %>
-                    <div class="mb-4 p-2 bg-red-200 text-red-800 rounded">
-                        <%= @form_error %>
+          <div class="bg-gradient-to-br from-gray-50 to-gray-100 border border-gray-200 p-6 rounded-2xl shadow-lg mb-6">
+            <h3 class="text-lg font-semibold mb-4 text-gray-800">Add New User</h3>
+            <%= if @form_error do %>
+              <div class="mb-4 p-3 bg-red-100 border border-red-200 text-red-800 rounded-lg text-sm">
+                <%= @form_error %>
+              </div>
+            <% end %>
+            <.form for={%{}} phx-submit="add_user" phx-change="update_form">
+              <div class="space-y-4">
+                <div>
+                  <label class="block text-gray-700 text-sm font-semibold mb-2">Name</label>
+                  <input type="text" name="user[name]" value={@form_data["name"]} class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200" placeholder="Enter full name" />
+                </div>
+
+                <div>
+                  <label class="block text-gray-700 text-sm font-semibold mb-2">Role</label>
+                  <input type="text" name="user[role]" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200" value={@form_data["role"]} placeholder="Enter role/position" />
+                </div>
+
+                <div>
+                  <label class="block text-gray-700 text-sm font-semibold mb-2">Reports To</label>
+                  <%= if @dropdown_options == [] do %>
+                    <div class="p-4 bg-blue-50 border border-blue-200 text-blue-700 rounded-xl text-sm">
+                      <div class="flex items-center space-x-2">
+                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                          <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
+                        </svg>
+                        <span>This will be the first user (CEO/Root)</span>
+                      </div>
                     </div>
-                <% end %>
-                <.form for={%{}} phx-submit="add_user" phx-change="update_form">
-                    <div class="mb-4">
-                        <label class="block text-gray-700 text-md font-semibold mb-2">
-                            Name
-                        </label>
-                        <input type="text" name="user[name]" value={@form_data["name"]} class="shadow borlder rounded w-full py-2 px-3 text-gray-700" />
+                  <% else %>
+                    <select name="user[reports_to]" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200" required>
+                      <option value="" disabled selected={@form_data["reports_to"] in [nil, "", "--Select--"]}>-- Select Manager --</option>
+                      <%= for option <- @dropdown_options do %>
+                        <option value={option.value} selected={@form_data["reports_to"] == option.value}>
+                          <%= option.display %>
+                        </option>
+                      <% end %>
+                    </select>
+                  <% end %>
+                </div>
 
-                        <!--1. dropdown for roles not sure if it should be -->
-                        <div class="mb-4">
-                            <label class="block text-gray-700 text-md font-semibold mb-2">
-                                Role
-                            </label>
-                            <input type="text" name="user[role]" class="shadow border rounded w-full py-2 px-3 text-gray-900" value={@form_data["role"]} placeholder="Enter Role" />
-                        </div>
-
-                        <!--2. dropdown for reports to -->
-                        <div class="mb-4">
-                            <label class="block text-gray-700 text-md font-semibold mb-2">
-                                Reports To
-                            </label>
-                            <%= if @dropdown_options == [] do %>
-                                <div class="p-2 bg-gray-100 text-gray-500 rounded">No existing users - this will be the first user</div>
-                            <% else %>
-                                <select name="user[reports_to]" class="shadow border rounded w-full py-2 px-3 text-gray-900" required>
-                                    <option value="" disabled selected={@form_data["reports_to"] in [nil, "", "--Select--"]}>--Select--</option>
-                                    <%= for option <- @dropdown_options do %>
-                                        <option value={option.value} selected={@form_data["reports_to"] == option.value}>
-                                            <%= option.display %>
-                                        </option>
-                                    <% end %>
-                                </select>
-                            <% end %>
-                        </div>
-
-                        <div class="flex space-x-2">
-                            <button type="submit" class="bg-blue-400 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded">
-                                Add User
-                            </button>
-                            <button type="button" phx-click="toggle_form" class="bg-gray-500 hover:bg-gray-900 text-white font-semibold py-2 px-4 rounded">
-                                Cancel
-                            </button>
-                        </div>
-                    </div> 
-    
-                </.form>
-            </div>
+                <div class="flex space-x-3 pt-2">
+                  <button type="submit" class="flex-1 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-semibold py-3 px-4 rounded-xl shadow-md hover:shadow-lg transition-all duration-300">
+                    Add User
+                  </button>
+                  <button type="button" phx-click="toggle_form" class="flex-1 bg-gray-500 hover:bg-gray-600 text-white font-semibold py-3 px-4 rounded-xl shadow-md hover:shadow-lg transition-all duration-300">
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </.form>
+          </div>
         <% end %>
-        
-        <!-- Edit form is only visible if @show_edit_form is true -->
+
+        <!-- Edit User Form -->
         <%= if @show_edit_form do %>
-            <div class="bg-gray-200 p-6 rounded shadow mt-4">
-                <h2 class="text-xl font-semibold mb-4">
-                    Edit User
-                </h2>
-                <%= if @form_error do %>
-                    <div class="mb-4 p-2 bg-red-200 text-red-800 rounded">
-                        <%= @form_error %>
-                    </div>
-                <% end %>
-                <.form for={%{}} phx-submit="update_node" phx-change="update_edit_form">
-                    <div class="mb-4">
-                        <label class="block text-gray-700 text-md font-semibold mb-2">
-                            Name
-                        </label>
-                        <input type="text" name="edit_user[name]" value={@edit_form_data["name"]} class="shadow border rounded w-full py-2 px-3 text-gray-700" />
+          <div class="bg-gradient-to-br from-amber-50 to-orange-100 border border-amber-200 p-6 rounded-2xl shadow-lg mb-6">
+            <h3 class="text-lg font-semibold mb-4 text-gray-800">Edit User</h3>
+            <%= if @form_error do %>
+              <div class="mb-4 p-3 bg-red-100 border border-red-200 text-red-800 rounded-lg text-sm">
+                <%= @form_error %>
+              </div>
+            <% end %>
+            <.form for={%{}} phx-submit="update_node" phx-change="update_edit_form">
+              <div class="space-y-4">
+                <div>
+                  <label class="block text-gray-700 text-sm font-semibold mb-2">Name</label>
+                  <input type="text" name="edit_user[name]" value={@edit_form_data["name"]} class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all duration-200" />
+                </div>
 
-                        <div class="mb-4">
-                            <label class="block text-gray-700 text-md font-semibold mb-2">
-                                Role
-                            </label>
-                            <input type="text" name="edit_user[role]" class="shadow border rounded w-full py-2 px-3 text-gray-900" value={@edit_form_data["role"]} placeholder="Enter Role" />
-                        </div>
+                <div>
+                  <label class="block text-gray-700 text-sm font-semibold mb-2">Role</label>
+                  <input type="text" name="edit_user[role]" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all duration-200" value={@edit_form_data["role"]} placeholder="Enter role/position" />
+                </div>
 
-                        <input type="hidden" name="edit_user[node_id]" value={@edit_form_data["node_id"]} />
+                <input type="hidden" name="edit_user[node_id]" value={@edit_form_data["node_id"]} />
 
-                        <div class="flex space-x-2">
-                            <button type="submit" class="bg-green-500 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded">
-                                Update User
-                            </button>
-                            <button type="button" phx-click="cancel_edit" class="bg-gray-500 hover:bg-gray-900 text-white font-semibold py-2 px-4 rounded">
-                                Cancel
-                            </button>
-                        </div>
-                    </div> 
-    
-                </.form>
-            </div>
+                <div class="flex space-x-3 pt-2">
+                  <button type="submit" class="flex-1 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-semibold py-3 px-4 rounded-xl shadow-md hover:shadow-lg transition-all duration-300">
+                    Update User
+                  </button>
+                  <button type="button" phx-click="cancel_edit" class="flex-1 bg-gray-500 hover:bg-gray-600 text-white font-semibold py-3 px-4 rounded-xl shadow-md hover:shadow-lg transition-all duration-300">
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </.form>
+          </div>
         <% end %>
+      </div>
     </div>
 
-    <div class="flex-1 px-6 py-2">
-        <h1 class="text-2xl font-bold mb-6 text-center">Organizational Chart</h1>
-        
-        
-        <!-- Tree display - completely re-render on version change -->
-        <div class="flex justify-center">
-            <%= if @tree_version do %>
-                <div id={"tree-v#{@tree_version}"}>
-                    <%= if @tree do %>
-                        <.render_tree node={@tree} />
-                    <% else %>
-                        <div class="text-center p-8">
-                            <div class="text-gray-500 text-lg mb-4">
-                                No organizational chart yet
-                            </div>
-                            <div class="text-gray-400 text-sm">
-                                Add your first user to get started!
-                            </div>
-                        </div>
-                    <% end %>
-                </div>
-            <% end %>
+    <!-- Main Content Area -->
+    <div class="flex-1 p-6 lg:p-8">
+      <div class="bg-white rounded-2xl shadow-xl border border-gray-200 min-h-[calc(100vh-3rem)]">
+        <div class="p-6 lg:p-8 border-b border-gray-100">
+          <h1 class="text-3xl font-bold text-gray-800 text-center mb-2">Organizational Chart</h1>
+          <p class="text-gray-600 text-center">Visualize your team structure and hierarchy</p>
         </div>
-    </div>      
-    
+
+        <div class="p-6 lg:p-8">
+          <div class="flex justify-center overflow-x-auto">
+            <%= if @tree_version do %>
+              <div id={"tree-v#{@tree_version}"} class="min-w-max">
+                <%= if @tree do %>
+                  <.render_tree node={@tree} />
+                <% else %>
+                  <div class="text-center py-16">
+                    <div class="w-24 h-24 mx-auto mb-6 bg-gradient-to-br from-blue-100 to-indigo-200 rounded-full flex items-center justify-center">
+                      <svg class="w-12 h-12 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                      </svg>
+                    </div>
+                    <div class="text-gray-500 text-xl font-semibold mb-3">No organizational chart yet</div>
+                    <div class="text-gray-400 text-sm mb-6">Start building your organization by adding your first team member</div>
+                    <button phx-click="toggle_form" class="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white font-semibold px-8 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105">
+                      Add First User
+                    </button>
+                  </div>
+                <% end %>
+              </div>
+            <% end %>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>

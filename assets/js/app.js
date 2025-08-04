@@ -54,16 +54,3 @@ window.addEventListener("phx:tree-updated", (e) => {
     }, 10);
   }
 });
-
-document.addEventListener("DOMContentLoaded", () => {
-    const nodes = document.querySelectorAll(".tree-node");
-    nodes.forEach(node => {
-      node.addEventListener("click", (e) => {
-        e.stopPropagation();
-        const children = node.nextElementSibling;
-        if (children) {
-          children.classList.toggle("hidden");
-        }
-      });
-    });
-  });

@@ -6,7 +6,6 @@ defmodule TreeOrgWeb.TreeTestLive do
 
   def mount(_params, _session, socket) do
     if connected?(socket), do: Phoenix.PubSub.subscribe(TreeOrg.PubSub, "tree_updates")
-    # Get tree from ETS
     tree = TreeStorage.get_tree()
     version = TreeStorage.get_version()
 
@@ -15,13 +14,15 @@ defmodule TreeOrgWeb.TreeTestLive do
       |> assign(:tree, tree)
       |> assign(:tree_version, version)
       |> assign(:form_data, %{"name" => "", "role" => "", "reports_to" => ""})
-      |> assign(:dropdown_options, extract_paths(tree))
+      |> assign(:dropdown_options, extract_paths(tree, [], []))
       |> assign(:show_form, false)
       |> assign(:form_error, nil)
       |> assign(:editing_node, nil)
       |> assign(:show_edit_form, false)
       |> assign(:edit_form_data, %{"name" => "", "role" => "", "node_id" => ""})
-      |> assign(:debug_info, "Initial mount")
+      |> assign(:show_group_modal, false)
+      |> assign(:group_members, [])
+      |> assign(:group_title, "")
 
     {:ok, socket}
   end
@@ -43,48 +44,33 @@ defmodule TreeOrgWeb.TreeTestLive do
 
     Logger.info("Attempting to add user with form_data: #{inspect(socket.assigns.form_data)}")
 
-    # Basic validation
     if String.trim(name) == "" or String.trim(role) == "" do
       Logger.error("Validation failed: Name and role must be filled")
       {:noreply, put_flash(socket, :error, "Please fill in name and role fields.")}
     else
-      # Create new node
       node_name = "#{role} - #{name}"
       node_id = "node-#{:os.system_time(:millisecond)}"
       new_node = %{id: node_id, name: node_name, children: []}
 
-      # If tree is nil (empty), create the first node as root
       if tree == nil do
         Logger.info("Creating first node as root: #{node_name}")
         TreeStorage.update_tree(new_node)
         {:noreply, put_flash(socket, :info, "First user added successfully!")}
       else
-        # Check if reports_to is valid for existing tree
         if reports_to in [nil, "", "--Select--"] do
           Logger.error("Validation failed: Must select a valid 'Reports To' value")
           {:noreply, put_flash(socket, :error, "Please select a valid 'Reports To' value.")}
         else
-          # Get the target parent ID (last in the comma-separated path)
           parent_ids = String.split(reports_to, ",")
           target_parent_id = List.last(parent_ids)
 
-          # Debug info
-          debug_info = "Adding #{node_name} to parent #{target_parent_id}"
-          Logger.info(debug_info)
-
-          # Insert the node
           {updated_tree, success} = insert_child(tree, target_parent_id, new_node)
 
           if success do
-            IO.inspect(updated_tree, label: "Updated Tree")
-
-            # Update tree in ETS and broadcast
             TreeStorage.update_tree(updated_tree)
-            # Do NOT update assigns here! Let handle_info/2 do it.
             {:noreply, put_flash(socket, :info, "User added successfully!")}
           else
             Logger.error("Node insertion failed. Parent node with id #{target_parent_id} not found")
-            socket = assign(socket, :debug_info, "#{debug_info} - FAILED")
             {:noreply, put_flash(socket, :error, "Failed to find the parent node. Please try again.")}
           end
         end
@@ -129,9 +115,7 @@ defmodule TreeOrgWeb.TreeTestLive do
       new_name = "#{role} - #{name}"
       updated_tree = update_node_name(tree, node_id, new_name)
 
-      # Update tree in ETS and broadcast
       TreeStorage.update_tree(updated_tree)
-      # Do NOT update assigns here! Let handle_info/2 do it.
       {:noreply, put_flash(socket, :info, "Node updated successfully!")}
     end
   end
@@ -156,49 +140,78 @@ defmodule TreeOrgWeb.TreeTestLive do
     tree = TreeStorage.get_tree()
     updated_tree = delete_node(tree, node_id)
 
-    # Update tree in ETS and broadcast
     TreeStorage.update_tree(updated_tree)
-    # Do NOT update assigns here! Let handle_info/2 do it.
     {:noreply, put_flash(socket, :info, "Node deleted successfully!")}
   end
 
-  # Add this to handle PubSub updates
-  def handle_info(:tree_updated, socket) do
-    Logger.info("[LiveView] Received :tree_updated in handle_info")
-    # Force a full page reload on the client
-    {:noreply, push_navigate(socket, to: "/")}
+  def handle_event("show_group_members", %{"group_id" => group_id}, socket) do
+    Logger.info("show_group_members event triggered with group_id: #{group_id}")
+
+    # Find the parent node that contains the group
+    parent_node = find_parent_of_group(socket.assigns.tree, group_id)
+
+    if parent_node do
+      # Now, find the actual group node within the parent's children
+      {_leaf_nodes, non_leaf_nodes} = group_leaf_nodes(parent_node.children)
+      {leaf_nodes, _non_leaf_nodes} = group_leaf_nodes(parent_node.children)
+      all_children = leaf_nodes ++ non_leaf_nodes
+      group_node = Enum.find(all_children, fn child -> Map.get(child, :id) == group_id end)
+
+      if group_node do
+        group_members = group_node.children || []
+        group_title = group_node.name || "Team Members"
+
+        socket =
+          socket
+          |> assign(:show_group_modal, true)
+          |> assign(:group_members, group_members)
+          |> assign(:group_title, group_title)
+
+        {:noreply, socket}
+      else
+        {:noreply, put_flash(socket, :error, "Group not found inside the parent.")}
+      end
+    else
+      {:noreply, put_flash(socket, :error, "Parent of group not found.")}
+    end
   end
 
-  # Simple recursive insert that returns {tree, success_boolean}
-  # Base case: The current node is the target parent.
-  # Add the new child to its children list.
+  def handle_event("close_group_modal", _params, socket) do
+    socket =
+      socket
+      |> assign(:show_group_modal, false)
+      |> assign(:group_members, [])
+      |> assign(:group_title, "")
+    {:noreply, socket}
+  end
+
+  def handle_info(:tree_updated, socket) do
+    Logger.info("[LiveView] Received :tree_updated in handle_info")
+    tree = TreeStorage.get_tree()
+    version = TreeStorage.get_version()
+    {:noreply, socket |> assign(:tree, tree) |> assign(:tree_version, version)}
+  end
+
   defp insert_child(%{id: id, children: children} = node, target_id, new_child) when id == target_id do
     Logger.debug("Found target parent with id #{id}. Adding new child.")
     updated_node = %{node | children: (children || []) ++ [new_child]}
     {updated_node, true}
   end
 
-  # Recursive step: The target is not this node, so search in its children.
   defp insert_child(%{children: children} = node, target_id, new_child) when is_list(children) do
-    # We need to track if an update has happened anywhere in the children.
-    # We'll use map_reduce to both transform the children list and track success.
     {updated_children, overall_success} =
       Enum.map_reduce(children, false, fn child, success_acc ->
         {updated_child, success} = insert_child(child, target_id, new_child)
-        # If this branch was successful, the whole operation is successful.
         {updated_child, success or success_acc}
       end)
 
-    # Return the node with its potentially updated children and the success status.
     {%{node | children: updated_children}, overall_success}
   end
 
-  # Base case: The node has no children and is not the target.
   defp insert_child(node, _target_id, _new_child) do
-    {node, false} # Return the node unchanged.
+    {node, false}
   end
 
-  # Helper functions
   defp find_node_by_id(%{id: id} = node, target_id) when id == target_id, do: node
   defp find_node_by_id(%{children: children}, target_id) when is_list(children) do
     Enum.find_value(children, fn child ->
@@ -229,7 +242,7 @@ defmodule TreeOrgWeb.TreeTestLive do
   defp delete_node(node, _target_id), do: node
 
   defp extract_paths(nil, _id_path, _name_path), do: []
-  defp extract_paths(node, id_path \\ [], name_path \\ []) do
+  defp extract_paths(node, id_path, name_path) do
     current_id_path = id_path ++ [node.id]
     current_name_path = name_path ++ [node.name]
     display_path = Enum.join(current_name_path, " > ")
@@ -239,38 +252,64 @@ defmodule TreeOrgWeb.TreeTestLive do
     paths ++ child_paths
   end
 
-  # Add this helper function to your LiveView module or create a separate helper module
-  defp get_avatar_color(node_id) do
-    # Define a list of attractive background colors
+  def get_avatar_color(node_id) do
     colors = [
-      "bg-blue-500",
-      "bg-green-500",
-      "bg-purple-500",
-      "bg-pink-500",
-      "bg-indigo-500",
-      "bg-red-500",
-      "bg-yellow-500",
-      "bg-teal-500",
-      "bg-orange-500",
-      "bg-cyan-500",
-      "bg-lime-500",
-      "bg-rose-500",
-      "bg-emerald-500",
-      "bg-violet-500",
-      "bg-amber-500",
-      "bg-sky-500"
+      "bg-blue-500", "bg-green-500", "bg-purple-500", "bg-pink-500", "bg-indigo-500",
+      "bg-red-500", "bg-yellow-500", "bg-teal-500", "bg-orange-500", "bg-cyan-500",
+      "bg-lime-500", "bg-rose-500", "bg-emerald-500", "bg-violet-500", "bg-amber-500", "bg-sky-500"
     ]
 
-    # Create a hash from the node_id and use it to select a color
     hash = :erlang.phash2(node_id, length(colors))
     Enum.at(colors, hash)
   end
 
+  defp is_leaf?(%{children: children}) when is_list(children), do: Enum.empty?(children)
+  defp is_leaf?(_), do: true
 
+  defp group_leaf_nodes(children) do
+    {leaf_nodes, non_leaf_nodes} = Enum.split_with(children, &is_leaf?/1)
+
+    if length(leaf_nodes) > 3 do
+      group_id = "leaf-group-#{hd(leaf_nodes).parent_id}"
+      grouped_node = %{
+        id: group_id,
+        name: "Team Members (#{length(leaf_nodes)})",
+        children: leaf_nodes,
+        is_group: true
+      }
+      {[grouped_node], non_leaf_nodes}
+    else
+      {leaf_nodes, non_leaf_nodes}
+    end
+  end
+
+
+
+  defp find_parent_of_group(node, group_id) do
+    # Check if the current node is the parent of the group.
+    {leaf_nodes, _non_leaf_nodes} = Enum.split_with(node.children || [], &is_leaf?/1)
+    if length(leaf_nodes) > 3 do
+      # Construct a group_id that is consistent and dependent on the parent.
+      # Assuming parent_id is available in the leaf nodes.
+      parent_id = hd(leaf_nodes).parent_id
+      expected_group_id = "leaf-group-#{parent_id}"
+      if expected_group_id == group_id do
+        node
+      end
+    end
+
+    # Recursively search in the children of the current node.
+    Enum.find_value(node.children || [], fn child ->
+      find_parent_of_group(child, group_id)
+    end)
+  end
 
   def render_tree(assigns) do
     children = assigns[:node].children || []
-    n = Enum.count(children)
+    {leaf_nodes, non_leaf_nodes} = group_leaf_nodes(children)
+    all_children = leaf_nodes ++ non_leaf_nodes
+
+    n = Enum.count(all_children)
     x2s =
       if n > 0 do
         Enum.map(1..n, fn i ->
@@ -280,26 +319,27 @@ defmodule TreeOrgWeb.TreeTestLive do
         []
       end
     assigns = assigns
-    |> Map.put(:children, children)
+    |> Map.put(:children, all_children)
     |> Map.put(:x2s, x2s)
 
     ~H"""
     <div class="flex flex-col items-center relative">
       <div class="relative group">
-        <div class="tree-node cursor-pointer px-4 py-4 border border-gray-300 bg-blue-100 text-sm rounded shadow-sm inline-block mb-3 flex items-center space-x-3">
-          <!-- Avatar with different colors based on node ID -->
-          <div class={"w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-lg #{get_avatar_color(@node.id)}"}>
+        <div class="tree-node cursor-pointer px-6 py-4 border-2 border-gray-200 bg-gradient-to-br from-blue-50 to-blue-100 hover:from-blue-100 hover:to-blue-150 text-sm rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 inline-block mb-6 flex items-center space-x-4 min-w-[200px]">
+          <div class={"w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-md #{get_avatar_color(@node.id)}"}>
             <%= String.first(@node.name) |> String.upcase() %>
           </div>
-          <span><%= @node.name %></span>
+          <div class="flex-1">
+            <div class="font-semibold text-gray-800"><%= @node.name %></div>
+          </div>
         </div>
 
-        <div class="absolute top-0 right-0 transform translate-x-full -translate-y-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex space-x-1">
+        <div class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex space-x-1">
           <%= if @node.id != "ceo-1" do %>
             <button
               phx-click="edit_node"
               phx-value-node_id={@node.id}
-              class="bg-yellow-500 hover:bg-yellow-600 text-white text-xs px-2 py-1 rounded"
+              class="bg-amber-500 hover:bg-amber-600 text-white text-xs px-2 py-1 rounded-full shadow-md transition-colors duration-200"
               title="Edit"
             >
               ✏️
@@ -307,7 +347,7 @@ defmodule TreeOrgWeb.TreeTestLive do
             <button
               phx-click="delete_node"
               phx-value-node_id={@node.id}
-              class="bg-red-500 hover:bg-red-600 text-white text-xs px-2 py-1 rounded"
+              class="bg-red-500 hover:bg-red-600 text-white text-xs px-2 py-1 rounded-full shadow-md transition-colors duration-200"
               title="Delete"
               onclick="return confirm('Are you sure you want to delete this node?')"
             >
@@ -318,21 +358,41 @@ defmodule TreeOrgWeb.TreeTestLive do
       </div>
 
       <%= if @children != [] do %>
-        <div class="relative w-full flex justify-center items-start" style="height: 40px;">
-          <svg width="100%" height="40" style="position: absolute; left: 0; top: 0; pointer-events: none;">
+        <div class="relative w-full flex justify-center items-start" style="height: 50px;">
+          <svg width="100%" height="50" style="position: absolute; left: 0; top: 0; pointer-events: none;">
             <%= for {_child, idx} <- Enum.with_index(@children) do %>
               <line
                 x1="50%" y1="0"
                 x2={to_string(Enum.at(@x2s, idx)) <> "%"}
-                y2="40"
-                stroke="#a0aec0" stroke-width="2" />
+                y2="50"
+                stroke="#6366f1" stroke-width="3" opacity="0.7" />
             <% end %>
           </svg>
         </div>
-        <div class="flex justify-center space-x-4 relative w-full">
+        <div class="flex justify-center space-x-8 relative w-full">
           <%= for child <- @children do %>
             <div class="relative z-10 flex-1 flex justify-center">
-              <.render_tree node={child} />
+              <%= if Map.get(child, :is_group, false) do %>
+                <div class="flex flex-col items-center relative">
+                  <div class="relative group">
+                    <button
+                      phx-click="show_group_members"
+                      phx-value-group_id={child.id}
+                      class="tree-node cursor-pointer px-6 py-4 border-2 border-green-200 bg-gradient-to-br from-green-50 to-green-100 hover:from-green-100 hover:to-green-150 text-sm rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 inline-block mb-6 flex items-center space-x-4 min-w-[200px]"
+                    >
+                      <div class="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-lg bg-green-500 shadow-md">
+                        👥
+                      </div>
+                      <div class="flex-1">
+                        <div class="font-semibold text-gray-800"><%= child.name %></div>
+                        <div class="text-xs text-gray-600">Click to view members</div>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+              <% else %>
+                <.render_tree node={child} />
+              <% end %>
             </div>
           <% end %>
         </div>
