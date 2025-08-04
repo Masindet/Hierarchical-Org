@@ -105,7 +105,7 @@ defmodule TreeOrgWeb.TreeTestLive do
   end
 
   def handle_event("update_node", _params, socket) do
-    %{edit_form_data: %{"name" => name, "role" => role, "node_id" => node_id}} = socket.assigns
+    %{:edit_form_data => %{"name" => name, "role" => role, "node_id" => node_id}} = socket.assigns
     tree = TreeStorage.get_tree()
 
     if String.trim(name) == "" or String.trim(role) == "" do
@@ -310,36 +310,58 @@ defmodule TreeOrgWeb.TreeTestLive do
     all_children = leaf_nodes ++ non_leaf_nodes
 
     n = Enum.count(all_children)
-    x2s =
+
+    # Calculate positions with better spacing for visual appeal
+    positions =
       if n > 0 do
-        Enum.map(1..n, fn i ->
-          ((100 / (n + 1)) * i)
-        end)
+        if n == 1 do
+          [50.0]  # Center single child
+        else
+          # Use wider distribution for better visual spacing
+          padding = 5.0  # Reduced padding for more space usage
+          available_width = 100.0 - (2 * padding)
+          step = available_width / (n - 1)
+          Enum.map(0..(n-1), fn i ->
+            padding + (step * i)
+          end)
+        end
       else
         []
       end
+
+    # Calculate minimum width based on number of children for better spacing
+    min_width = case n do
+      0 -> "auto"
+      1 -> "300px"
+      2 -> "600px"
+      3 -> "900px"
+      4 -> "1200px"
+      _ -> "#{n * 280}px"  # Dynamic width based on children count
+    end
+
     assigns = assigns
     |> Map.put(:children, all_children)
-    |> Map.put(:x2s, x2s)
+    |> Map.put(:positions, positions)
+    |> Map.put(:min_width, min_width)
 
     ~H"""
-    <div class="flex flex-col items-center relative">
-      <div class="relative group">
-        <div class="tree-node cursor-pointer px-6 py-4 border-2 border-gray-200 bg-gradient-to-br from-blue-50 to-blue-100 hover:from-blue-100 hover:to-blue-150 text-sm rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 inline-block mb-6 flex items-center space-x-4 min-w-[200px]">
-          <div class={"w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-md #{get_avatar_color(@node.id)}"}>
+    <div class="flex flex-col items-center relative" style={"min-width: #{@min_width};"}>
+      <div class="relative group mb-8">
+        <div class="tree-node cursor-pointer px-8 py-6 border-2 border-gray-200 bg-gradient-to-br from-blue-50 to-blue-100 hover:from-blue-100 hover:to-blue-150 text-base rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 inline-block flex items-center space-x-4 min-w-[280px]">
+          <div class={"w-14 h-14 rounded-full flex items-center justify-center text-white font-bold text-xl shadow-md #{get_avatar_color(@node.id)}"}>
             <%= String.first(@node.name) |> String.upcase() %>
           </div>
           <div class="flex-1">
-            <div class="font-semibold text-gray-800"><%= @node.name %></div>
+            <div class="font-semibold text-gray-800 text-lg"><%= @node.name %></div>
           </div>
         </div>
 
-        <div class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex space-x-1">
+        <div class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex space-x-2">
           <%= if @node.id != "ceo-1" do %>
             <button
               phx-click="edit_node"
               phx-value-node_id={@node.id}
-              class="bg-amber-500 hover:bg-amber-600 text-white text-xs px-2 py-1 rounded-full shadow-md transition-colors duration-200"
+              class="bg-amber-500 hover:bg-amber-600 text-white text-sm px-3 py-2 rounded-full shadow-md transition-colors duration-200"
               title="Edit"
             >
               ✏️
@@ -347,7 +369,7 @@ defmodule TreeOrgWeb.TreeTestLive do
             <button
               phx-click="delete_node"
               phx-value-node_id={@node.id}
-              class="bg-red-500 hover:bg-red-600 text-white text-xs px-2 py-1 rounded-full shadow-md transition-colors duration-200"
+              class="bg-red-500 hover:bg-red-600 text-white text-sm px-3 py-2 rounded-full shadow-md transition-colors duration-200"
               title="Delete"
               onclick="return confirm('Are you sure you want to delete this node?')"
             >
@@ -358,34 +380,36 @@ defmodule TreeOrgWeb.TreeTestLive do
       </div>
 
       <%= if @children != [] do %>
-        <div class="relative w-full flex justify-center items-start" style="height: 50px;">
-          <svg width="100%" height="50" style="position: absolute; left: 0; top: 0; pointer-events: none;">
+        <div class="relative w-full flex justify-center items-start" style="height: 80px;">
+          <svg width="100%" height="80" style="position: absolute; left: 0; top: 0; pointer-events: none;">
             <%= for {_child, idx} <- Enum.with_index(@children) do %>
               <line
                 x1="50%" y1="0"
-                x2={to_string(Enum.at(@x2s, idx)) <> "%"}
-                y2="50"
+                x2={to_string(Enum.at(@positions, idx)) <> "%"}
+                y2="80"
                 stroke="#6366f1" stroke-width="3" opacity="0.7" />
             <% end %>
           </svg>
         </div>
-        <div class="flex justify-center space-x-8 relative w-full">
-          <%= for child <- @children do %>
-            <div class="relative z-10 flex-1 flex justify-center">
+
+        <!-- Use relative positioning container with absolute positioned children -->
+        <div class="relative w-full" style="min-height: 400px;">
+          <%= for {child, idx} <- Enum.with_index(@children) do %>
+            <div class="absolute" style={"left: #{Enum.at(@positions, idx)}%; transform: translateX(-50%); top: 0;"}>
               <%= if Map.get(child, :is_group, false) do %>
                 <div class="flex flex-col items-center relative">
                   <div class="relative group">
                     <button
                       phx-click="show_group_members"
                       phx-value-group_id={child.id}
-                      class="tree-node cursor-pointer px-6 py-4 border-2 border-green-200 bg-gradient-to-br from-green-50 to-green-100 hover:from-green-100 hover:to-green-150 text-sm rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 inline-block mb-6 flex items-center space-x-4 min-w-[200px]"
+                      class="tree-node cursor-pointer px-8 py-6 border-2 border-green-200 bg-gradient-to-br from-green-50 to-green-100 hover:from-green-100 hover:to-green-150 text-base rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 inline-block flex items-center space-x-4 min-w-[280px]"
                     >
-                      <div class="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-lg bg-green-500 shadow-md">
+                      <div class="w-14 h-14 rounded-full flex items-center justify-center text-white font-bold text-xl bg-green-500 shadow-md">
                         👥
                       </div>
                       <div class="flex-1">
-                        <div class="font-semibold text-gray-800"><%= child.name %></div>
-                        <div class="text-xs text-gray-600">Click to view members</div>
+                        <div class="font-semibold text-gray-800 text-lg"><%= child.name %></div>
+                        <div class="text-sm text-gray-600">Click to view members</div>
                       </div>
                     </button>
                   </div>
