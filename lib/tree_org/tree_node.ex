@@ -17,6 +17,28 @@ defmodule TreeOrg.TreeNode do
     |> validate_required([:name])
   end
 
+  # Custom inspect function to prevent infinite recursion
+  defimpl Inspect, for: __MODULE__ do
+    def inspect(node, _opts) do
+      "#TreeNode<id: #{node.id}, name: \"#{node.name}\", parent_id: #{inspect(node.parent_id)}>"
+    end
+  end
+
+  # Safe inspect function for logging - excludes associations
+  def safe_inspect(node) do
+    if is_nil(node) do
+      "nil"
+    else
+      %{
+        id: node.id,
+        name: node.name,
+        parent_id: node.parent_id,
+        inserted_at: node.inserted_at,
+        updated_at: node.updated_at
+      }
+    end
+  end
+
   def build_tree_from_nodes(nodes) do
     # Group nodes by parent_id for efficient lookup
     nodes_by_parent = Enum.group_by(nodes, &(&1.parent_id))

@@ -37,13 +37,14 @@ window.addEventListener("phx:page-loading-stop", _info => topbar.hide())
 liveSocket.connect()
 
 // expose liveSocket on window for web console debug logs and latency simulation:
-// >> liveSocket.enableDebug()
-// >> liveSocket.enableLatencySim(1000)  // enabled for duration of browser session
-// >> liveSocket.disableLatencySim()
+liveSocket.enableDebug()
+liveSocket.enableLatencySim(1000)  // enabled for duration of browser session
+liveSocket.disableLatencySim()
 window.liveSocket = liveSocket
 
 // Handle tree updates from LiveView
 window.addEventListener("phx:tree-updated", (e) => {
+  window.location.reload();
   console.log("Tree updated event received:", e.detail);
   // Force a DOM refresh by temporarily hiding and showing the container
   const container = document.querySelector('[id^="org-chart-container"]');
