@@ -13,10 +13,7 @@ defmodule TreeOrg.TreeStorageServer do
     :ets.new(@table_name, [:set, :public, :named_table])
 
     # Load tree from database
-    tree = load_tree_from_database()
-
-    :ets.insert(@table_name, {:tree, tree})
-    :ets.insert(@table_name, {:version, 1})
+    load_tree_from_database()
 
     {:ok, %{}}
   end
@@ -28,11 +25,17 @@ defmodule TreeOrg.TreeStorageServer do
     # Fetch all tree nodes from database
     nodes = Repo.all(TreeNode)
 
-    # Build tree structure from nodes
-    case TreeNode.build_tree_from_nodes(nodes) do
-      [root_node] -> root_node
-      [] -> nil  # Return nil instead of "Empty" node
-      _ -> %{id: nil, name: "Multiple Roots", children: []}
+    # Find the root node (the one with no parent)
+    root_node = Enum.find(nodes, &is_nil(&1.parent_id))
+
+    # Insert each node into the ETS table
+    Enum.each(nodes, fn node ->
+      :ets.insert(@table_name, {node.id, node})
+    end)
+
+    # Store the ID of the root node
+    if root_node do
+      :ets.insert(@table_name, {:root_id, root_node.id})
     end
   end
 end

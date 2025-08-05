@@ -9,15 +9,14 @@ defmodule TreeOrgWeb.TreeTestLive do
 
   def mount(_params, _session, socket) do
     if connected?(socket), do: Phoenix.PubSub.subscribe(TreeOrg.PubSub, "tree_updates")
-    tree = TreeStorage.get_tree()
-    version = TreeStorage.get_version()
+
+    tree = TreeStorage.get_root_node()
 
     socket =
       socket
       |> assign(:tree, tree)
-      |> assign(:tree_version, version)
       |> assign(:form_data, %{"name" => "", "role" => "", "reports_to" => ""})
-      |> assign(:dropdown_options, extract_paths(tree, [], []))
+      |> assign(:dropdown_options, extract_paths(tree))
       |> assign(:show_form, false)
       |> assign(:form_error, nil)
       |> assign(:editing_node, nil)
@@ -26,6 +25,7 @@ defmodule TreeOrgWeb.TreeTestLive do
       |> assign(:show_group_modal, false)
       |> assign(:group_members, [])
       |> assign(:group_title, "")
+      |> assign(:tree_version, 1)
 
     {:ok, socket}
   end
@@ -43,47 +43,29 @@ defmodule TreeOrgWeb.TreeTestLive do
     name = Map.get(form_data, "name", "")
     role = Map.get(form_data, "role", "")
     reports_to = Map.get(form_data, "reports_to", nil)
-    tree = TreeStorage.get_tree()
-
-    Logger.info("Attempting to add user with form_data: #{inspect(socket.assigns.form_data)}")
 
     if String.trim(name) == "" or String.trim(role) == "" do
-      Logger.error("Validation failed: Name and role must be filled")
       {:noreply, put_flash(socket, :error, "Please fill in name and role fields.")}
     else
       node_name = "#{role} - #{name}"
-      node_id = "node-#{:os.system_time(:millisecond)}"
-      new_node = %{id: node_id, name: node_name, children: []}
+      parent_id = if reports_to in [nil, "", "--Select--"], do: nil, else: reports_to
 
-      if tree == nil do
-        Logger.info("Creating first node as root: #{node_name}")
-        TreeStorage.update_tree(new_node)
-        {:noreply, put_flash(socket, :info, "First user added successfully!")}
-      else
-        if reports_to in [nil, "", "--Select--"] do
-          Logger.error("Validation failed: Must select a valid 'Reports To' value")
-          {:noreply, put_flash(socket, :error, "Please select a valid 'Reports To' value.")}
-        else
-          parent_ids = String.split(reports_to, ",")
-          target_parent_id = List.last(parent_ids)
-
-          {updated_tree, success} = insert_child(tree, target_parent_id, new_node)
-
-          if success do
-            TreeStorage.update_tree(updated_tree)
-            {:noreply, put_flash(socket, :info, "User added successfully!")}
-          else
-            Logger.error("Node insertion failed. Parent node with id #{target_parent_id} not found")
-            {:noreply, put_flash(socket, :error, "Failed to find the parent node. Please try again.")}
-          end
-        end
+      case TreeStorage.add_node(node_name, parent_id) do
+        {:ok, _} ->
+          broadcast_tree_update()
+          {:noreply,
+           socket
+           |> put_flash(:info, "User added successfully!")
+           |> assign(:show_form, false)
+           |> assign(:form_data, %{"name" => "", "role" => "", "reports_to" => ""})}
+        {:error, changeset} ->
+          {:noreply, put_flash(socket, :error, "Failed to add user. Errors: #{inspect(changeset.errors)}")}
       end
     end
   end
 
   def handle_event("edit_node", %{"node_id" => node_id}, socket) do
-    tree = TreeStorage.get_tree()
-    node = find_node_by_id(tree, node_id)
+    node = TreeStorage.get_node(node_id)
 
     if node do
       parts = String.split(node.name, " - ", parts: 2)
@@ -99,6 +81,7 @@ defmodule TreeOrgWeb.TreeTestLive do
         |> assign(:editing_node, node)
         |> assign(:edit_form_data, edit_form_data)
         |> assign(:show_edit_form, true)
+        |> assign(:show_group_modal, false)
         |> assign(:form_error, nil)
 
       {:noreply, socket}
@@ -109,17 +92,23 @@ defmodule TreeOrgWeb.TreeTestLive do
 
   def handle_event("update_node", _params, socket) do
     %{:edit_form_data => %{"name" => name, "role" => role, "node_id" => node_id}} = socket.assigns
-    tree = TreeStorage.get_tree()
 
     if String.trim(name) == "" or String.trim(role) == "" do
       socket = assign(socket, :form_error, "Please fill in all fields.")
       {:noreply, socket}
     else
       new_name = "#{role} - #{name}"
-      updated_tree = update_node_name(tree, node_id, new_name)
-
-      TreeStorage.update_tree(updated_tree)
-      {:noreply, put_flash(socket, :info, "Node updated successfully!")}
+      case TreeStorage.update_node(node_id, %{name: new_name}) do
+        {:ok, _} ->
+          broadcast_tree_update()
+          {:noreply,
+           socket
+           |> put_flash(:info, "Node updated successfully!")
+           |> assign(:show_edit_form, false)
+           |> assign(:editing_node, nil)}
+        {:error, _} ->
+          {:noreply, put_flash(socket, :error, "Failed to update node.")}
+      end
     end
   end
 
@@ -138,13 +127,20 @@ defmodule TreeOrgWeb.TreeTestLive do
   end
 
   def handle_event("delete_node", %{"node_id" => node_id}, socket) do
-    Logger.info("Attempting to delete node with id: #{node_id}")
+    children = TreeStorage.get_children(node_id)
+    if Enum.any?(children) do
+      {:noreply, put_flash(socket, :error, "Cannot delete a node with children. Please delete the children first.")}
+    else
+      Logger.info("Attempting to delete node with id: #{node_id}")
 
-    tree = TreeStorage.get_tree()
-    updated_tree = delete_node(tree, node_id)
-
-    TreeStorage.update_tree(updated_tree)
-    {:noreply, put_flash(socket, :info, "Node deleted successfully!")}
+      case TreeStorage.delete_node(node_id) do
+        :ok ->
+          broadcast_tree_update()
+          {:noreply, put_flash(socket, :info, "Node deleted successfully!")}
+        {:error, _} ->
+          {:noreply, put_flash(socket, :error, "Failed to delete node.")}
+      end
+    end
   end
 
   def handle_event("show_group_members", %{"group_id" => group_id}, socket) do
@@ -155,8 +151,9 @@ defmodule TreeOrgWeb.TreeTestLive do
 
     if parent_node do
       # Now, find the actual group node within the parent's children
-      {_leaf_nodes, non_leaf_nodes} = group_leaf_nodes(parent_node.children)
-      {leaf_nodes, _non_leaf_nodes} = group_leaf_nodes(parent_node.children)
+      children = TreeStorage.get_children(parent_node.id)
+      {_leaf_nodes, non_leaf_nodes} = group_leaf_nodes(children, parent_node.id)
+      {leaf_nodes, _non_leaf_nodes} = group_leaf_nodes(children, parent_node.id)
       all_children = leaf_nodes ++ non_leaf_nodes
       group_node = Enum.find(all_children, fn child -> Map.get(child, :id) == group_id end)
 
@@ -188,70 +185,36 @@ defmodule TreeOrgWeb.TreeTestLive do
     {:noreply, socket}
   end
 
+  defp broadcast_tree_update() do
+    Phoenix.PubSub.broadcast(TreeOrg.PubSub, "tree_updates", :tree_updated)
+  end
+
   def handle_info(:tree_updated, socket) do
     Logger.info("[LiveView] Received :tree_updated in handle_info")
-    tree = TreeStorage.get_tree()
-    version = TreeStorage.get_version()
-    {:noreply, socket |> assign(:tree, tree) |> assign(:tree_version, version)}
+    tree = TreeStorage.get_root_node()
+    {:noreply,
+     socket
+     |> assign(:tree, tree)
+     |> assign(:dropdown_options, extract_paths(tree))
+     |> assign(:show_group_modal, false)
+     |> update(:tree_version, &(&1 + 1))}
   end
 
-  defp insert_child(%{id: id, children: children} = node, target_id, new_child) when id == target_id do
-    Logger.debug("Found target parent with id #{id}. Adding new child.")
-    updated_node = %{node | children: (children || []) ++ [new_child]}
-    {updated_node, true}
+  defp extract_paths(nil), do: []
+  defp extract_paths(node) do
+    do_extract_paths(node, [], [])
   end
 
-  defp insert_child(%{children: children} = node, target_id, new_child) when is_list(children) do
-    {updated_children, overall_success} =
-      Enum.map_reduce(children, false, fn child, success_acc ->
-        {updated_child, success} = insert_child(child, target_id, new_child)
-        {updated_child, success or success_acc}
-      end)
-
-    {%{node | children: updated_children}, overall_success}
-  end
-
-  defp insert_child(node, _target_id, _new_child) do
-    {node, false}
-  end
-
-  defp find_node_by_id(%{id: id} = node, target_id) when id == target_id, do: node
-  defp find_node_by_id(%{children: children}, target_id) when is_list(children) do
-    Enum.find_value(children, fn child ->
-      find_node_by_id(child, target_id)
-    end)
-  end
-  defp find_node_by_id(_, _), do: nil
-
-  defp update_node_name(%{id: id} = node, target_id, new_name) when id == target_id do
-    %{node | name: new_name}
-  end
-  defp update_node_name(%{children: children} = node, target_id, new_name) when is_list(children) do
-    updated_children = Enum.map(children, fn child ->
-      update_node_name(child, target_id, new_name)
-    end)
-    %{node | children: updated_children}
-  end
-  defp update_node_name(node, _target_id, _new_name), do: node
-
-  defp delete_node(%{children: children} = node, target_id) when is_list(children) do
-    updated_children =
-      children
-      |> Enum.reject(fn child -> child.id == target_id end)
-      |> Enum.map(fn child -> delete_node(child, target_id) end)
-
-    %{node | children: updated_children}
-  end
-  defp delete_node(node, _target_id), do: node
-
-  defp extract_paths(nil, _id_path, _name_path), do: []
-  defp extract_paths(node, id_path, name_path) do
+  defp do_extract_paths(nil, _, _), do: []
+  defp do_extract_paths(node, id_path, name_path) do
     current_id_path = id_path ++ [node.id]
     current_name_path = name_path ++ [node.name]
     display_path = Enum.join(current_name_path, " > ")
-    value_path = Enum.join(current_id_path, ",")
+    value_path = node.id
     paths = [%{display: display_path, value: value_path}]
-    child_paths = Enum.flat_map(node.children || [], &extract_paths(&1, current_id_path, current_name_path))
+
+    children = TreeStorage.get_children(node.id)
+    child_paths = Enum.flat_map(children, &do_extract_paths(&1, current_id_path, current_name_path))
     paths ++ child_paths
   end
 
@@ -266,14 +229,16 @@ defmodule TreeOrgWeb.TreeTestLive do
     Enum.at(colors, hash)
   end
 
-  defp is_leaf?(%{children: children}) when is_list(children), do: Enum.empty?(children)
-  defp is_leaf?(_), do: true
+  defp is_leaf?(node) do
+    Enum.empty?(TreeStorage.get_children(node.id))
+  end
 
-  defp group_leaf_nodes(children) do
+  # Fixed group_leaf_nodes function - now takes parent_id as parameter
+  defp group_leaf_nodes(children, parent_id) do
     {leaf_nodes, non_leaf_nodes} = Enum.split_with(children, &is_leaf?/1)
 
     if length(leaf_nodes) > 3 do
-      group_id = "leaf-group-#{hd(leaf_nodes).parent_id}"
+      group_id = "leaf-group-#{parent_id}"
       grouped_node = %{
         id: group_id,
         name: "Team Members (#{length(leaf_nodes)})",
@@ -286,29 +251,26 @@ defmodule TreeOrgWeb.TreeTestLive do
     end
   end
 
+  defp find_parent_of_group(nil, _), do: nil
   defp find_parent_of_group(node, group_id) do
-    # Check if the current node is the parent of the group.
-    {leaf_nodes, _non_leaf_nodes} = Enum.split_with(node.children || [], &is_leaf?/1)
-    if length(leaf_nodes) > 3 do
-      # Construct a group_id that is consistent and dependent on the parent.
-      # Assuming parent_id is available in the leaf nodes.
-      parent_id = hd(leaf_nodes).parent_id
-      expected_group_id = "leaf-group-#{parent_id}"
-      if expected_group_id == group_id do
-        node
-      end
-    end
+    children = TreeStorage.get_children(node.id)
+    {leaf_nodes, _non_leaf_nodes} = Enum.split_with(children, &is_leaf?/1)
+    expected_group_id = "leaf-group-#{node.id}"
 
-    # Recursively search in the children of the current node.
-    Enum.find_value(node.children || [], fn child ->
-      find_parent_of_group(child, group_id)
-    end)
+    if length(leaf_nodes) > 3 && expected_group_id == group_id do
+      node
+    else
+      Enum.find_value(children, fn child ->
+        find_parent_of_group(child, group_id)
+      end)
+    end
   end
 
   # Calculate bottom-up positioning for the entire tree
+  defp calculate_tree_positions(nil, _level), do: nil
   defp calculate_tree_positions(node, level \\ 0) do
-    children = node.children || []
-    {leaf_nodes, non_leaf_nodes} = group_leaf_nodes(children)
+    children = TreeStorage.get_children(node.id)
+    {leaf_nodes, non_leaf_nodes} = group_leaf_nodes(children, node.id)
     all_children = leaf_nodes ++ non_leaf_nodes
 
     if Enum.empty?(all_children) do
@@ -334,7 +296,7 @@ defmodule TreeOrgWeb.TreeTestLive do
       spacing_width = (length(child_positions) - 1) * min_spacing
       required_width = max(300, total_children_width + spacing_width)
 
-      # Position children relative to their parent's center
+      # Position children relative to their parent\'s center
       {positioned_children, _} = Enum.map_reduce(child_positions, -required_width / 2, fn child, current_x ->
         positioned_child = %{child | x_position: current_x + child.width / 2}
         {positioned_child, current_x + child.width + min_spacing}
@@ -351,6 +313,7 @@ defmodule TreeOrgWeb.TreeTestLive do
   end
 
   # Collect all nodes with their final positions for rendering
+  defp collect_positioned_nodes(nil), do: []
   defp collect_positioned_nodes(tree_pos, offset_x \\ 0) do
     current_node = %{
       node: tree_pos.node,
@@ -366,6 +329,7 @@ defmodule TreeOrgWeb.TreeTestLive do
   end
 
   # Generate SVG lines connecting parent to children
+  defp generate_connection_lines(nil), do: []
   defp generate_connection_lines(tree_pos, offset_x \\ 0, parent_x \\ nil, parent_level \\ nil) do
     current_x = offset_x + tree_pos.x_position
     current_level = tree_pos.level
