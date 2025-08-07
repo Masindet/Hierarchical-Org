@@ -698,27 +698,58 @@ defmodule TreeOrgWeb.TreeTestLive do
 
     ~H"""
     <div class="flex flex-col items-center relative w-full overflow-x-auto">
+      <!--  chart container the @is the calculated container width and height to define space needed for svg & nodes-->
       <div class="relative" style={"width: #{@container_width}px; height: #{@container_height}px;"}>
-        <!-- SVG for connection lines -->
+
+        <!-- SVG for connection lines z-10 to ensure it sits behind other elements & pointer... allows click to pass through it so btns arent blocked -->
         <svg
           class="absolute top-0 left-0 pointer-events-none z-10"
           width={@container_width}
           height={@container_height}
         >
           <%= for {x1, y1, x2, y2} <- @connection_lines do %>
+            <%=
+              mid_y = trunc((y1 + y2) / 2)
+              adj_x1 = x1 - @min_x + 150
+              adj_x2 = x2 - @min_x + 150
+            %>
+
+            <!-- Vertical line from y1 to mid_y -->
             <line
-              x1={x1 - @min_x + 150}
+              x1={adj_x1}
               y1={y1}
-              x2={x2 - @min_x + 150}
+              x2={adj_x1}
+              y2={mid_y}
+              stroke="#6366f1"
+              stroke-width="2"
+              opacity="0.7"
+            />
+
+            <!-- Horizontal line from x1 to x2 at mid_y -->
+            <line
+              x1={adj_x1}
+              y1={mid_y}
+              x2={adj_x2}
+              y2={mid_y}
+              stroke="#6366f1"
+              stroke-width="2"
+              opacity="0.7"
+            />
+
+            <!-- Vertical line from mid_y to y2 -->
+            <line
+              x1={adj_x2}
+              y1={mid_y}
+              x2={adj_x2}
               y2={y2}
               stroke="#6366f1"
-              stroke-width="3"
+              stroke-width="2"
               opacity="0.7"
             />
           <% end %>
         </svg>
 
-        <!-- Render nodes at their calculated positions -->
+        <!-- Render nodes(boxes) at their calculated positions using nested loop by levels -->
         <%= for {level, nodes} <- @nodes_by_level do %>
           <%= for positioned_node <- nodes do %>
             <div
@@ -744,8 +775,9 @@ defmodule TreeOrgWeb.TreeTestLive do
                   </div>
                 </div>
               <% else %>
+                <!--the nodes(boxes) -->
                 <div class="relative group">
-                  <div class="tree-node cursor-pointer px-8 py-6 border-2 border-gray-200 bg-gradient-to-br from-blue-50 to-blue-100 hover:from-blue-100 hover:to-blue-150 text-base rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 inline-block flex items-center space-x-4 min-w-[280px]">
+                  <div class="tree-node cursor-pointer mt-6 px-8 py-6 border-2 border-gray-200 bg-gradient-to-br from-blue-50 to-blue-100 hover:from-blue-100 hover:to-blue-150 text-base rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 inline-block flex items-center space-x-4 min-w-[280px]">
                     <div class={"w-14 h-14 rounded-full flex items-center justify-center text-white font-bold text-xl shadow-md #{get_avatar_color(positioned_node.node.id)}"}>
                       <%= String.first(positioned_node.node.name) |> String.upcase() %>
                     </div>
