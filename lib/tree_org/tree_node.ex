@@ -4,6 +4,7 @@ defmodule TreeOrg.TreeNode do
 
   schema "tree_nodes" do
     field :name, :string
+    field :is_group, :boolean, default: false
 
     belongs_to :parent, TreeOrg.TreeNode
     has_many :children, TreeOrg.TreeNode, foreign_key: :parent_id
@@ -13,7 +14,7 @@ defmodule TreeOrg.TreeNode do
 
   def changeset(tree_node, attrs) do
     tree_node
-    |> cast(attrs, [:name, :parent_id])
+    |> cast(attrs, [:name, :parent_id, :is_group])
     |> validate_required([:name])
   end
 
@@ -32,6 +33,7 @@ defmodule TreeOrg.TreeNode do
       %{
         id: node.id,
         name: node.name,
+        is_group: Map.get(node, :is_group, false),
         parent_id: node.parent_id,
         inserted_at: node.inserted_at,
         updated_at: node.updated_at

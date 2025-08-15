@@ -5,82 +5,93 @@ Repo.delete_all(TreeNode)
 
 # === Helpers ===
 defmodule Seeder do
+  def create_group(name, parent_id \\ nil) do
+    TreeOrg.Repo.insert!(%TreeOrg.TreeNode{
+      name: name,
+      parent_id: parent_id,
+      is_group: true
+    })
+  end
+
   def create_team(parent, base_name, count) do
     for i <- 1..count do
       TreeOrg.Repo.insert!(%TreeOrg.TreeNode{
         name: "#{base_name} #{i}",
-        parent_id: parent.id
+        parent_id: parent.id,
+        is_group: false
       })
     end
+    count
   end
 end
 
-# === EXECUTIVE LEVEL ===
-ceo = Repo.insert!(%TreeNode{name: "CEO"})
+total = 0
 
-cto = Repo.insert!(%TreeNode{name: "CTO", parent_id: ceo.id})
-cfo = Repo.insert!(%TreeNode{name: "CFO", parent_id: ceo.id})
-coo = Repo.insert!(%TreeNode{name: "COO", parent_id: ceo.id})
-cmo = Repo.insert!(%TreeNode{name: "CMO", parent_id: ceo.id})
-cro = Repo.insert!(%TreeNode{name: "CRO", parent_id: ceo.id})
-clo = Repo.insert!(%TreeNode{name: "CLO", parent_id: ceo.id})
+# === EXECUTIVE LEVEL ===
+ceo = Seeder.create_group("CEO")
+
+cto = Seeder.create_group("CTO", ceo.id)
+cfo = Seeder.create_group("CFO", ceo.id)
+coo = Seeder.create_group("COO", ceo.id)
+cmo = Seeder.create_group("CMO", ceo.id)
+cro = Seeder.create_group("CRO", ceo.id)
+clo = Seeder.create_group("CLO", ceo.id)
 
 # === ENGINEERING ===
-vp_eng = Repo.insert!(%TreeNode{name: "VP of Engineering", parent_id: cto.id})
+vp_eng = Seeder.create_group("VP of Engineering", cto.id)
 
-frontend_mgr = Repo.insert!(%TreeNode{name: "Frontend Manager", parent_id: vp_eng.id})
-backend_mgr = Repo.insert!(%TreeNode{name: "Backend Manager", parent_id: vp_eng.id})
-devops_mgr = Repo.insert!(%TreeNode{name: "DevOps Manager", parent_id: vp_eng.id})
+frontend_mgr = Seeder.create_group("Frontend Manager", vp_eng.id)
+backend_mgr = Seeder.create_group("Backend Manager", vp_eng.id)
+devops_mgr = Seeder.create_group("DevOps Manager", vp_eng.id)
 
-Seeder.create_team(frontend_mgr, "Frontend Dev", 120)
-Seeder.create_team(backend_mgr, "Backend Dev", 120)
-Seeder.create_team(devops_mgr, "DevOps Engineer", 80)
+total = total + Seeder.create_team(frontend_mgr, "Frontend Dev", 180)
+total = total + Seeder.create_team(backend_mgr, "Backend Dev", 180)
+total = total + Seeder.create_team(devops_mgr, "DevOps Engineer", 100)
 
 # === QA ===
-qa_mgr = Repo.insert!(%TreeNode{name: "QA Manager", parent_id: cto.id})
-Seeder.create_team(qa_mgr, "QA Engineer", 60)
+qa_mgr = Seeder.create_group("QA Manager", cto.id)
+total = total + Seeder.create_team(qa_mgr, "QA Engineer", 80)
 
 # === PRODUCT & DESIGN ===
-vp_product = Repo.insert!(%TreeNode{name: "VP of Product", parent_id: cto.id})
-pm_mgr = Repo.insert!(%TreeNode{name: "Product Manager", parent_id: vp_product.id})
-ux_mgr = Repo.insert!(%TreeNode{name: "UX Manager", parent_id: vp_product.id})
+vp_product = Seeder.create_group("VP of Product", cto.id)
+pm_mgr = Seeder.create_group("Product Manager", vp_product.id)
+ux_mgr = Seeder.create_group("UX Manager", vp_product.id)
 
-Seeder.create_team(pm_mgr, "PM", 30)
-Seeder.create_team(ux_mgr, "UX Designer", 30)
+total = total + Seeder.create_team(pm_mgr, "PM", 60)
+total = total + Seeder.create_team(ux_mgr, "UX Designer", 60)
 
 # === FINANCE & ACCOUNTING ===
-finance_mgr = Repo.insert!(%TreeNode{name: "Finance Manager", parent_id: cfo.id})
-accounting_mgr = Repo.insert!(%TreeNode{name: "Accounting Manager", parent_id: cfo.id})
+finance_mgr = Seeder.create_group("Finance Manager", cfo.id)
+accounting_mgr = Seeder.create_group("Accounting Manager", cfo.id)
 
-Seeder.create_team(finance_mgr, "Financial Analyst", 35)
-Seeder.create_team(accounting_mgr, "Accountant", 35)
+total = total + Seeder.create_team(finance_mgr, "Financial Analyst", 60)
+total = total + Seeder.create_team(accounting_mgr, "Accountant", 60)
 
 # === HR ===
-hr_mgr = Repo.insert!(%TreeNode{name: "HR Manager", parent_id: coo.id})
-Seeder.create_team(hr_mgr, "HR Specialist", 30)
+hr_mgr = Seeder.create_group("HR Manager", coo.id)
+total = total + Seeder.create_team(hr_mgr, "HR Specialist", 50)
 
 # === OPERATIONS ===
-ops_mgr = Repo.insert!(%TreeNode{name: "Operations Manager", parent_id: coo.id})
-Seeder.create_team(ops_mgr, "Ops Staff", 40)
+ops_mgr = Seeder.create_group("Operations Manager", coo.id)
+total = total + Seeder.create_team(ops_mgr, "Ops Staff", 60)
 
 # === SALES & MARKETING ===
-sales_mgr = Repo.insert!(%TreeNode{name: "Sales Manager", parent_id: cro.id})
-marketing_mgr = Repo.insert!(%TreeNode{name: "Marketing Manager", parent_id: cmo.id})
+sales_mgr = Seeder.create_group("Sales Manager", cro.id)
+marketing_mgr = Seeder.create_group("Marketing Manager", cmo.id)
 
-Seeder.create_team(sales_mgr, "Sales Rep", 50)
-Seeder.create_team(marketing_mgr, "Marketing Executive", 50)
+total = total + Seeder.create_team(sales_mgr, "Sales Rep", 90)
+total = total + Seeder.create_team(marketing_mgr, "Marketing Executive", 90)
 
 # === LEGAL ===
-legal_mgr = Repo.insert!(%TreeNode{name: "Legal Manager", parent_id: clo.id})
-Seeder.create_team(legal_mgr, "Legal Officer", 25)
+legal_mgr = Seeder.create_group("Legal Manager", clo.id)
+total = total + Seeder.create_team(legal_mgr, "Legal Officer", 30)
 
 # === SUPPORT ===
-support_mgr = Repo.insert!(%TreeNode{name: "Customer Support Manager", parent_id: coo.id})
-Seeder.create_team(support_mgr, "Support Agent", 50)
+support_mgr = Seeder.create_group("Customer Support Manager", coo.id)
+total = total + Seeder.create_team(support_mgr, "Support Agent", 70)
 
 # === R&D ===
-rnd_mgr = Repo.insert!(%TreeNode{name: "R&D Manager", parent_id: cto.id})
-Seeder.create_team(rnd_mgr, "R&D Specialist", 40)
+rnd_mgr = Seeder.create_group("R&D Manager", cto.id)
+total = total + Seeder.create_team(rnd_mgr, "R&D Specialist", 60)
 
-# === DONE ===
-IO.puts("🎉 Seeded ~1000 employees across all departments!")
+IO.puts("🎉 Seeded #{total} employees across all departments (plus groups)")

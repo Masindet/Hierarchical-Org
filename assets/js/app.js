@@ -55,3 +55,21 @@ window.addEventListener("phx:tree-updated", (e) => {
     }, 10);
   }
 });
+
+// Smooth scroll to a group card by id and highlight a person
+window.addEventListener("phx:scroll-to-group", (e) => {
+  const { group_id } = e.detail || {}
+  const el = document.getElementById(`group-${group_id}`)
+  if (!el) return
+  el.scrollIntoView({behavior: 'smooth', block: 'center', inline: 'center'})
+})
+
+window.addEventListener("phx:highlight-person", (e) => {
+  const { person_id } = e.detail || {}
+  const el = document.getElementById(`person-${person_id}`)
+  if (!el) return
+  el.classList.add('ring-4', 'ring-indigo-400', 'ring-offset-2')
+  setTimeout(() => {
+    el.classList.remove('ring-4', 'ring-indigo-400', 'ring-offset-2')
+  }, 2000)
+})

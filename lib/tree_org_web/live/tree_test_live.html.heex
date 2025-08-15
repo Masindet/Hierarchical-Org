@@ -9,6 +9,36 @@
   </div>
 <% end %>
 
+<!-- Add Group Modal -->
+<%= if @show_add_group_modal do %>
+  <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-y-auto" phx-click-away="cancel_add_group">
+      <div class="p-6 border-b border-gray-200 flex items-center justify-between">
+        <h3 class="text-xl font-semibold text-gray-800">Add Group</h3>
+        <button phx-click="cancel_add_group" class="text-gray-400 hover:text-gray-600 transition-colors duration-200 p-2 hover:bg-gray-100 rounded-full" type="button">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+      <div class="p-6">
+        <.form for={%{}} phx-submit="add_group" phx-change="update_add_group_form">
+          <div class="space-y-4">
+            <div>
+              <label class="block text-gray-700 text-sm font-semibold mb-2">Group Name</label>
+              <input type="text" name="group[name]" value={@add_group_name} class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200" placeholder="e.g. Engineering" />
+            </div>
+            <div class="flex justify-end space-x-3 pt-2">
+              <button type="button" phx-click="cancel_add_group" class="bg-gray-500 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-xl shadow-md transition-all duration-300">Cancel</button>
+              <button type="submit" class="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-xl shadow-md transition-all duration-300">Add Group</button>
+            </div>
+          </div>
+        </.form>
+      </div>
+    </div>
+  </div>
+<% end %>
+
 <%= if Phoenix.Flash.get(@flash, :error) do %>
   <div class="mb-4 p-4 bg-red-100 border border-red-200 text-red-800 rounded-lg text-center shadow-sm">
     <div class="flex items-center justify-center space-x-2">
@@ -84,7 +114,7 @@
         <%= if @group_members != [] do %>
           <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             <%= for member <- @group_members do %>
-              <div class="bg-gradient-to-br from-gray-50 to-gray-100 border-2 border-gray-200 rounded-xl p-4 hover:shadow-lg transition-all duration-300 hover:scale-105">
+             <div id={"person-#{member.id}"} class="bg-gradient-to-br from-gray-50 to-gray-100 border-2 border-gray-200 rounded-xl p-4 hover:shadow-lg transition-all duration-300 hover:scale-105">
                 <div class="flex items-center space-x-3">
                   <div class={"w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-md #{TreeOrgWeb.TreeTestLive.get_avatar_color(member.id)}"}>
                     <%= String.first(member.name) |> String.upcase() %>
@@ -93,27 +123,25 @@
                     <div class="font-semibold text-gray-800 truncate"><%= member.name %></div>
                   </div>
                 </div>
-
-                <div class="mt-3 flex space-x-2">
-                  <button
-                    phx-click="edit_node"
-                    phx-value-node_id={member.id}
-                    class="flex-1 bg-amber-500 hover:bg-amber-600 text-white font-medium py-2 px-3 rounded-lg text-sm transition-colors duration-200 flex items-center justify-center space-x-1"
-                    type="button"
-                  >
-                    <span>✏️</span>
-                    <span>Edit</span>
-                  </button>
-                  <button
-                    phx-click="delete_node"
-                    phx-value-node_id={member.id}
-                    class="flex-1 bg-red-500 hover:bg-red-600 text-white font-medium py-2 px-3 rounded-lg text-sm transition-colors duration-200 flex items-center justify-center space-x-1"
-                    type="button"
-                    onclick="return confirmDelete('Are you sure you want to delete this member?')"
-                  >
-                    <span>🗑️</span>
-                    <span>Delete</span>
-                  </button>
+                <div class= "mt-3 flex items-center justify-between">
+                  <span class="text-xs text-gray-500">Member</span>
+                  <div class="flex space-x-2">
+                    <button
+                      phx-click="edit_node"
+                      phx-value-node_id={member.id}
+                      type="button"
+                      class="text-xs px-2 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded"
+                      title="Edit Person"
+                    >Edit</button>
+                    <button
+                      phx-click="delete_node"
+                      phx-value-node_id={member.id}
+                      type="button"
+                      class="text-xs px-2 py-1 bg-red-500 hover:bg-red-600 text-white rounded"
+                      onclick="return confirmDelete('Delete this person?')"
+                      title="Delete Person"
+                    >Delete</button>
+                  </div>
                 </div>
               </div>
             <% end %>
@@ -128,66 +156,139 @@
 
       <div class="p-6 border-t border-gray-200 bg-gray-50 rounded-b-2xl">
         <div class="flex justify-center">
+          <div class="flex space-x-3">
+            <button
+              phx-click="open_add_person"
+              phx-value-group_id={@current_group_id}
+              class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-6 py-3 rounded-xl shadow-md transition-colors duration-200"
+              type="button"
+            >
+              Add Person to this Group
+            </button>
+            <%= if @current_group_id do %>
+              <button
+                phx-click="delete_node"
+                phx-value-node_id={@current_group_id}
+                class="bg-red-600 hover:bg-red-700 text-white font-semibold px-6 py-3 rounded-xl shadow-md transition-colors duration-200"
+                onclick="return confirmDelete('Delete this group and all its sub-groups?')"
+                type="button"
+              >
+                Delete Group
+              </button>
+            <% end %>
           <button
             phx-click="close_group_modal"
-            class="bg-gray-600 hover:bg-gray-700 text-white font-semibold px-8 py-3 rounded-xl shadow-md transition-colors duration-200"
+              class="bg-gray-600 hover:bg-gray-700 text-white font-semibold px-6 py-3 rounded-xl shadow-md transition-colors duration-200"
             type="button"
           >
             Close
           </button>
+          </div>
         </div>
       </div>
     </div>
   </div>
 <% end %>
 
-<div class="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
-  <div class="flex flex-col lg:flex-row w-full">
-    <!-- Sidebar -->
-    <div class="bg-white shadow-xl lg:w-1/3 xl:w-1/4 border-r border-gray-200">
-      <div class="p-6 border-b border-gray-100">
-        <h2 class="text-xl font-bold text-gray-800 mb-4">Organization Management</h2>
-        <button phx-click="toggle_form" class="w-full bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white font-semibold px-6 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105" type="button">
-          <div class="flex items-center justify-center space-x-2">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+<!-- Add Person Modal -->
+<%= if @show_add_person_modal do %>
+  <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-y-auto" phx-click-away="close_add_person_modal">
+      <div class="p-6 border-b border-gray-200 flex items-center justify-between">
+        <h3 class="text-xl font-semibold text-gray-800">Add New Department/Team</h3>
+        <button phx-click="close_add_person_modal" class="text-gray-400 hover:text-gray-600 transition-colors duration-200 p-2 hover:bg-gray-100 rounded-full" type="button">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
             </svg>
-            <span>Add New User</span>
-          </div>
         </button>
-
-        <!-- <button phx-click="debug_state" class="w-full mt-2 bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 text-white font-semibold px-6 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105" type="button"> 
-          <div class="flex items-center justify-center space-x-2">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-            </svg>
-            <span>Debug State</span>
-          </div>
-        </button>-->
       </div>
-
-      <div class="p-6 overflow-y-auto">
-        <!-- Add User Form -->
-        <%= if @show_form do %>
-          <div class="bg-gradient-to-br from-gray-50 to-gray-100 border border-gray-200 p-6 rounded-2xl shadow-lg mb-6">
-            <h3 class="text-lg font-semibold mb-4 text-gray-800">Add New User</h3>
+      <div class="p-6">
             <%= if @form_error do %>
               <div class="mb-4 p-3 bg-red-100 border border-red-200 text-red-800 rounded-lg text-sm">
                 <%= @form_error %>
               </div>
             <% end %>
+
+<!-- Edit Group Modal -->
+<%= if @show_edit_group_modal do %>
+  <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-y-auto" phx-click-away="cancel_edit_group">
+      <div class="p-6 border-b border-gray-200 flex items-center justify-between">
+        <h3 class="text-xl font-semibold text-gray-800">Edit Group</h3>
+        <button phx-click="cancel_edit_group" class="text-gray-400 hover:text-gray-600 transition-colors duration-200 p-2 hover:bg-gray-100 rounded-full" type="button">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+      <div class="p-6">
+        <.form for={%{}} phx-submit="save_edit_group" phx-change="update_edit_group_form">
+          <div class="space-y-4">
+            <div>
+              <label class="block text-gray-700 text-sm font-semibold mb-2">Group Name</label>
+              <input type="text" name="group[name]" value={@edit_group_data["name"]} class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all duration-200" />
+            </div>
+            <input type="hidden" name="group[node_id]" value={@edit_group_data["node_id"]} />
+            <div class="flex justify-end space-x-3 pt-2">
+              <button type="button" phx-click="cancel_edit_group" class="bg-gray-500 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-xl shadow-md transition-all duration-300">Cancel</button>
+              <button type="submit" class="bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-semibold py-2 px-4 rounded-xl shadow-md transition-all duration-300">Save</button>
+            </div>
+          </div>
+        </.form>
+      </div>
+    </div>
+  </div>
+<% end %>
+
+<!-- Edit Person Modal -->
+<%= if @show_edit_person_modal do %>
+  <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-y-auto" phx-click-away="cancel_edit">
+      <div class="p-6 border-b border-gray-200 flex items-center justify-between">
+        <h3 class="text-xl font-semibold text-gray-800">Edit Person</h3>
+        <button phx-click="cancel_edit" class="text-gray-400 hover:text-gray-600 transition-colors duration-200 p-2 hover:bg-gray-100 rounded-full" type="button">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+      <div class="p-6">
+        <%= if @form_error do %>
+          <div class="mb-4 p-3 bg-red-100 border border-red-200 text-red-800 rounded-lg text-sm">
+            <%= @form_error %>
+          </div>
+        <% end %>
+        <.form for={%{}} phx-submit="update_node" phx-change="update_edit_form">
+          <div class="space-y-4">
+            <div>
+              <label class="block text-gray-700 text-sm font-semibold mb-2">Name</label>
+              <input type="text" name="edit_user[name]" value={@edit_form_data["name"]} class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all duration-200" />
+            </div>
+            <div>
+              <label class="block text-gray-700 text-sm font-semibold mb-2">Role</label>
+              <input type="text" name="edit_user[role]" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all duration-200" value={@edit_form_data["role"]} placeholder="Enter role/position" />
+            </div>
+            <input type="hidden" name="edit_user[node_id]" value={@edit_form_data["node_id"]} />
+            <div class="flex justify-end space-x-3 pt-2">
+              <button type="button" phx-click="cancel_edit" class="bg-gray-500 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-xl shadow-md transition-all duration-300">Cancel</button>
+              <button type="submit" class="bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-semibold py-2 px-4 rounded-xl shadow-md transition-all duration-300">Update</button>
+            </div>
+          </div>
+        </.form>
+      </div>
+    </div>
+  </div>
+<% end %>
             <.form for={%{}} phx-submit="add_user" phx-change="update_form">
               <div class="space-y-4">
                 <div>
                   <label class="block text-gray-700 text-sm font-semibold mb-2">Name</label>
                   <input type="text" name="user[name]" value={@form_data["name"]} class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200" placeholder="Enter full name" />
                 </div>
-
                 <div>
                   <label class="block text-gray-700 text-sm font-semibold mb-2">Role</label>
                   <input type="text" name="user[role]" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200" value={@form_data["role"]} placeholder="Enter role/position" />
                 </div>
-
                 <div>
                   <label class="block text-gray-700 text-sm font-semibold mb-2">Reports To</label>
                   <%= if @dropdown_options == [] do %>
@@ -196,7 +297,7 @@
                         <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                           <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
                         </svg>
-                        <span>This will be the first user (CEO/Root)</span>
+                        <span>This will be the first department/team</span>
                       </div>
                     </div>
                   <% else %>
@@ -210,64 +311,49 @@
                     </select>
                   <% end %>
                 </div>
-
-                <div class="flex space-x-3 pt-2">
-                  <button type="submit" class="flex-1 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-semibold py-3 px-4 rounded-xl shadow-md hover:shadow-lg transition-all duration-300">
-                    Add User
-                  </button>
-                  <button type="button" phx-click="toggle_form" class="flex-1 bg-gray-500 hover:bg-gray-600 text-white font-semibold py-3 px-4 rounded-xl shadow-md hover:shadow-lg transition-all duration-300">
-                    Cancel
-                  </button>
+            <div class="flex justify-end space-x-3 pt-2">
+              <button type="button" phx-click="close_add_person_modal" class="bg-gray-500 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-xl shadow-md transition-all duration-300">Cancel</button>
+              <button type="submit" class="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-semibold py-2 px-4 rounded-xl shadow-md transition-all duration-300">Add Department/Team</button>
                 </div>
               </div>
             </.form>
           </div>
-        <% end %>
-
-        <!-- Edit User Form -->
-        <%= if @show_edit_form do %>
-          <div class="bg-gradient-to-br from-amber-50 to-orange-100 border border-amber-200 p-6 rounded-2xl shadow-lg mb-6">
-            <h3 class="text-lg font-semibold mb-4 text-gray-800">Edit User</h3>
-            <%= if @form_error do %>
-              <div class="mb-4 p-3 bg-red-100 border border-red-200 text-red-800 rounded-lg text-sm">
-                <%= @form_error %>
-              </div>
-            <% end %>
-            <.form for={%{}} phx-submit="update_node" phx-change="update_edit_form">
-              <div class="space-y-4">
-                <div>
-                  <label class="block text-gray-700 text-sm font-semibold mb-2">Name</label>
-                  <input type="text" name="edit_user[name]" value={@edit_form_data["name"]} class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all duration-200" />
                 </div>
-
-                <div>
-                  <label class="block text-gray-700 text-sm font-semibold mb-2">Role</label>
-                  <input type="text" name="edit_user[role]" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all duration-200" value={@edit_form_data["role"]} placeholder="Enter role/position" />
-                </div>
-
-                <input type="hidden" name="edit_user[node_id]" value={@edit_form_data["node_id"]} />
-
-                <div class="flex space-x-3 pt-2">
-                  <button type="submit" class="flex-1 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-semibold py-3 px-4 rounded-xl shadow-md hover:shadow-lg transition-all duration-300">
-                    Update User
-                  </button>
-                  <button type="button" phx-click="cancel_edit" class="flex-1 bg-gray-500 hover:bg-gray-600 text-white font-semibold py-3 px-4 rounded-xl shadow-md hover:shadow-lg transition-all duration-300">
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            </.form>
           </div>
         <% end %>
-      </div>
-    </div>
 
+<div class="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
+  <div class="flex flex-col w-full">
     <!-- Main Content Area -->
     <div class="flex-1 p-6 lg:p-8">
       <div class="bg-white rounded-2xl shadow-xl border border-gray-200 min-h-[calc(100vh-3rem)]">
         <div class="p-6 lg:p-8 border-b border-gray-100">
-          <h1 class="text-3xl font-bold text-gray-800 text-center mb-2">Organizational Chart</h1>
-          <p class="text-gray-600 text-center">Visualize your team structure and hierarchy</p>
+          <div class="flex items-center justify-between">
+            <div>
+              <h1 class="text-3xl font-bold text-gray-800">Organizational Chart</h1>
+              <p class="text-gray-600">Visualize your team structure and hierarchy</p>
+            </div>
+            <div class="relative hidden md:block">
+              <.form for={%{}} phx-change="update_search" phx-submit="clear_search">
+                <input type="text" name="q" value={@search_query} placeholder="Search people..." class="w-72 pl-10 pr-10 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
+              </.form>
+              <svg class="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M10 18a8 8 0 100-16 8 8 0 000 16z" />
+              </svg>
+              <%= if @show_search_results && @search_results != [] do %>
+                <div class="absolute right-0 mt-2 w-80 bg-white border border-gray-200 rounded-xl shadow-lg z-50 max-h-80 overflow-auto">
+                  <%= for person <- @search_results do %>
+                    <div class="px-3 py-2 hover:bg-gray-50 cursor-pointer flex items-center space-x-2" phx-click="goto_person" phx-value-person_id={person.id}>
+                      <div class={"w-6 h-6 rounded-full flex items-center justify-center text-white text-[10px] font-bold #{TreeOrgWeb.TreeTestLive.get_avatar_color(person.id)}"}>
+                        <%= (person.name |> String.split(" ") |> Enum.map(&String.first/1) |> Enum.join("")) %>
+                      </div>
+                      <div class="truncate"><%= person.name %></div>
+                    </div>
+                  <% end %>
+                </div>
+              <% end %>
+            </div>
+          </div>
         </div>
 
         <div class="p-6 lg:p-8">
@@ -275,7 +361,7 @@
             <%= if @tree_version do %>
               <div id={"tree-v#{@tree_version}"} class="min-w-max">
                 <%= if @tree do %>
-                  <.render_tree node={@tree} />
+                  <.render_tree node={@tree} add_group_parent_id={@add_group_parent_id} add_group_name={@add_group_name} />
                 <% else %>
                   <div class="text-center py-16">
                     <div class="w-24 h-24 mx-auto mb-6 bg-gradient-to-br from-blue-100 to-indigo-200 rounded-full flex items-center justify-center">
@@ -285,8 +371,8 @@
                     </div>
                     <div class="text-gray-500 text-xl font-semibold mb-3">No organizational chart yet</div>
                     <div class="text-gray-400 text-sm mb-6">Start building your organization by adding your first team member</div>
-                    <button phx-click="toggle_form" class="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white font-semibold px-8 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105" type="button">
-                      Add First User
+                    <button phx-click="open_add_person" class="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white font-semibold px-8 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105" type="button">
+                      Add First Department/Team
                     </button>
                   </div>
                 <% end %>

@@ -72,14 +72,14 @@ defmodule TreeOrg.TreeStorage do
     children
   end
 
-  def add_node(name, parent_id) do
+  def add_node(name, parent_id, is_group \\ false) do
     ensure_table_exists()
     alias TreeOrg.Repo
     alias TreeOrg.TreeNode
 
-    Logger.info("TreeStorage: Adding node: name=#{name}, parent_id=#{inspect(parent_id)}")
+    Logger.info("TreeStorage: Adding node: name=#{name}, parent_id=#{inspect(parent_id)}, is_group=#{inspect(is_group)}")
 
-    changeset = TreeNode.changeset(%TreeNode{}, %{name: name, parent_id: parent_id})
+    changeset = TreeNode.changeset(%TreeNode{}, %{name: name, parent_id: parent_id, is_group: is_group})
 
     case Repo.insert(changeset) do
       {:ok, node} ->
