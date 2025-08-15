@@ -75,7 +75,11 @@ defmodule TreeOrgWeb.TreeTestLive do
 
       Logger.info("[LiveView] Adding node: #{node_name} with parent_id: #{inspect(parent_id)}")
 
-      case TreeStorage.add_node(node_name, parent_id, false) do
+      # If parent_id is nil, this is a root node, which should be a group.
+      # Otherwise, it's a person (leaf node) being added to a group.
+      is_group = is_nil(parent_id)
+
+      case TreeStorage.add_node(node_name, parent_id, is_group) do
         {:ok, new_node} ->
           Logger.info("[LiveView] Node added successfully: #{inspect(TreeNode.safe_inspect(new_node))}")
 
@@ -288,11 +292,18 @@ defmodule TreeOrgWeb.TreeTestLive do
   def handle_event("open_add_person", %{"group_id" => group_id}, socket) do
     Logger.info("[LiveView] Opening Add Person form for group_id=#{group_id}")
 
+    group_id_int =
+      cond do
+        is_integer(group_id) -> group_id
+        is_binary(group_id) -> String.to_integer(group_id)
+        true -> nil
+      end
+
     {:noreply,
      socket
      |> assign(:show_add_person_modal, true)
      |> assign(:form_error, nil)
-     |> assign(:form_data, %{"name" => "", "role" => "", "reports_to" => group_id})
+     |> assign(:form_data, %{"name" => "", "role" => "", "reports_to" => group_id_int})
      |> assign(:show_group_modal, false)}
   end
 
