@@ -933,12 +933,13 @@ defmodule TreeOrgWeb.TreeTestLive do
             >
               <div class="relative group flex flex-col items-center">
                 <div
-                      phx-click="show_group_members"
-                      phx-value-group_id={positioned_node.node.id}
-                  class="tree-node cursor-pointer mt-6 px-6 py-5 border-2 border-green-200 bg-gradient-to-br from-green-50 to-green-100 hover:from-green-100 hover:to-green-150 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 inline-block min-w-[280px] max-w-[320px]"
+                  phx-click="show_group_members"
+                  phx-value-group_id={positioned_node.node.id}
+                  class="tree-node cursor-pointer mt-4 px-12 py-3 border-2 border-green-200 bg-gradient-to-br from-green-50 to-green-100 hover:from-green-100 hover:to-green-150 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 inline-block min-w-[280px] max-w-[320px]"
                 >
+                  <!--pple icon -->
                   <div class="flex items-start space-x-4">
-                    <div class="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-lg bg-green-500 shadow-md">👥</div>
+                    <div class="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-lg bg-green-500 shadow-md">👥</div>
                     <div class="flex-1 min-w-0">
                       <div class="font-semibold text-gray-800 text-lg truncate"><%= positioned_node.node.name %></div>
                       <div class="text-sm text-gray-600"><%= length(positioned_node.members || []) %> members</div>
@@ -956,7 +957,7 @@ defmodule TreeOrgWeb.TreeTestLive do
                   </div>
 
                   <!-- Hover Delete (top-right inside) -->
-                  <div class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex space-x-2">
+                  <div class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex space-x-2 mb-48">
                     <button
                       phx-click="open_edit_group"
                       phx-value-group_id={positioned_node.node.id}
