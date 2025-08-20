@@ -1001,7 +1001,7 @@ defmodule TreeOrgWeb.TreeTestLive do
 
                 <!-- Inline Add Group form -->
                 <%= if @add_group_parent_id == positioned_node.node.id do %>
-                  <div class="mt-3 bg-white border-2 border-green-200 rounded-xl shadow-lg p-4 w-[320px]">
+                  <div class="hidden">
                     <h4 class="text-sm font-semibold text-gray-800 mb-2">Add Group under "<%= positioned_node.node.name %>"</h4>
                     <.form for={%{}} phx-submit="add_group" phx-change="update_add_group_form">
                       <div class="space-y-3">
