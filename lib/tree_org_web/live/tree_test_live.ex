@@ -45,6 +45,7 @@ defmodule TreeOrgWeb.TreeTestLive do
         |> assign(:show_search_results, false)
         |> assign(:highlight_person_id, nil)
       |> assign(:tree_version, 1)
+      |> assign(:node_to_delete, nil)
 
     {:ok, socket}
   end
@@ -55,7 +56,8 @@ defmodule TreeOrgWeb.TreeTestLive do
   end
 
   def handle_event("update_form", %{"user" => form_data}, socket) do
-    {:noreply, assign(socket, :form_data, form_data)}
+    new_form_data = Map.merge(socket.assigns.form_data, form_data)
+    {:noreply, assign(socket, :form_data, new_form_data)}
   end
 
   def handle_event("add_user", _params, socket) do
@@ -212,6 +214,7 @@ defmodule TreeOrgWeb.TreeTestLive do
            |> assign(:tree_version, new_tree_version)
            |> put_flash(:info, "Node updated successfully!")
            |> assign(:show_edit_form, false)
+           |> assign(:show_edit_person_modal, false)
            |> assign(:editing_node, nil)
            |> assign(:form_error, nil)
            |> assign(:edit_form_data, %{"name" => "", "role" => "", "node_id" => ""})
@@ -238,6 +241,14 @@ defmodule TreeOrgWeb.TreeTestLive do
       |> assign(:form_error, nil)
 
     {:noreply, socket}
+  end
+
+  def handle_event("confirm_delete_node", %{"node_id" => node_id}, socket) do
+    {:noreply, assign(socket, :node_to_delete, node_id)}
+  end
+
+  def handle_event("cancel_delete_node", _params, socket) do
+    {:noreply, assign(socket, :node_to_delete, nil)}
   end
 
   def handle_event("delete_node", %{"node_id" => node_id}, socket) do
@@ -281,6 +292,7 @@ defmodule TreeOrgWeb.TreeTestLive do
            |> assign(:show_edit_form, false)
            |> assign(:editing_node, nil)
            |> assign(:form_error, nil)
+           |> assign(:node_to_delete, nil)
            }
         {:error, error} ->
           Logger.error("[LiveView] Failed to delete node: #{inspect(error)}")
@@ -387,6 +399,9 @@ defmodule TreeOrgWeb.TreeTestLive do
         else
           socket
         end
+
+        # Push event to trigger client refresh
+        socket = push_event(socket, "tree-updated", %{action: "edit_group", node_id: node_id})
 
         {:noreply,
          socket
@@ -974,11 +989,10 @@ defmodule TreeOrgWeb.TreeTestLive do
                     >➕</button>
                     <%= if positioned_node.node.parent_id do %>
                       <button
-                        phx-click="delete_node"
+                        phx-click="confirm_delete_node"
                         phx-value-node_id={positioned_node.node.id}
                         class="bg-red-500 hover:bg-red-600 text-white text-xs px-2 py-1 rounded shadow-md transition-colors duration-200"
                         title="Delete Group"
-                        onclick="return confirmDelete('Delete this group and all its sub-groups?')"
                         type="button"
                       >🗑️</button>
                     <% end %>

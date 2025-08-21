@@ -80,11 +80,97 @@
     }
   });
 
-  // Handle confirmation dialogs for delete operations
-  function confirmDelete(message) {
-    return confirm(message || 'Are you sure you want to delete this item?');
-  }
+
 </script>
+
+<!-- Edit Group Modal (top-level) -->
+<%= if @show_edit_group_modal do %>
+  <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-y-auto" phx-click-away="cancel_edit_group">
+      <div class="p-6 border-b border-gray-200 flex items-center justify-between">
+        <h3 class="text-xl font-semibold text-gray-800">Edit Group</h3>
+        <button phx-click="cancel_edit_group" class="text-gray-400 hover:text-gray-600 transition-colors duration-200 p-2 hover:bg-gray-100 rounded-full" type="button">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+      <div class="p-6">
+        <.form for={%{}} phx-submit="save_edit_group" phx-change="update_edit_group_form">
+          <div class="space-y-4">
+            <div>
+              <label class="block text-gray-700 text-sm font-semibold mb-2">Group Name</label>
+              <input type="text" name="group[name]" value={@edit_group_data["name"]} class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all duration-200" />
+            </div>
+            <input type="hidden" name="group[node_id]" value={@edit_group_data["node_id"]} />
+            <div class="flex justify-end space-x-3 pt-2">
+              <button type="button" phx-click="cancel_edit_group" class="bg-gray-500 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-xl shadow-md transition-all duration-300">Cancel</button>
+              <button type="submit" class="bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-semibold py-2 px-4 rounded-xl shadow-md transition-all duration-300">Save</button>
+            </div>
+          </div>
+        </.form>
+      </div>
+    </div>
+  </div>
+<% end %>
+
+<!-- Confirm Delete Modal (top-level) -->
+<%= if @node_to_delete do %>
+  <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full">
+      <div class="p-6 border-b border-gray-200">
+        <h3 class="text-xl font-semibold text-gray-800">Confirm Deletion</h3>
+      </div>
+      <div class="p-6">
+        <p class="text-gray-600">Are you sure you want to delete this group?</p>
+      </div>
+      <div class="p-6 bg-gray-50 rounded-b-2xl flex justify-end space-x-3">
+        <button phx-click="cancel_delete_node" class="bg-gray-500 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-xl shadow-md transition-all duration-300">Cancel</button>
+        <button phx-click="delete_node" phx-value-node_id={@node_to_delete} class="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-xl shadow-md transition-all duration-300">Delete</button>
+      </div>
+    </div>
+  </div>
+<% end %>
+
+<!-- Edit Person Modal (top-level) -->
+<%= if @show_edit_person_modal do %>
+  <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-y-auto" phx-click-away="cancel_edit">
+      <div class="p-6 border-b border-gray-200 flex items-center justify-between">
+        <h3 class="text-xl font-semibold text-gray-800">Edit Person</h3>
+        <button phx-click="cancel_edit" class="text-gray-400 hover:text-gray-600 transition-colors duration-200 p-2 hover:bg-gray-100 rounded-full" type="button">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+      <div class="p-6">
+        <%= if @form_error do %>
+          <div class="mb-4 p-3 bg-red-100 border border-red-200 text-red-800 rounded-lg text-sm">
+            <%= @form_error %>
+          </div>
+        <% end %>
+        <.form for={%{}} phx-submit="update_node" phx-change="update_edit_form">
+          <div class="space-y-4">
+            <div>
+              <label class="block text-gray-700 text-sm font-semibold mb-2">Name</label>
+              <input type="text" name="edit_user[name]" value={@edit_form_data["name"]} class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all duration-200" />
+            </div>
+            <div>
+              <label class="block text-gray-700 text-sm font-semibold mb-2">Role</label>
+              <input type="text" name="edit_user[role]" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all duration-200" value={@edit_form_data["role"]} placeholder="Enter role/position" />
+            </div>
+            <input type="hidden" name="edit_user[node_id]" value={@edit_form_data["node_id"]} />
+            <div class="flex justify-end space-x-3 pt-2">
+              <button type="button" phx-click="cancel_edit" class="bg-gray-500 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-xl shadow-md transition-all duration-300">Cancel</button>
+              <button type="submit" class="bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-semibold py-2 px-4 rounded-xl shadow-md transition-all duration-300">Update</button>
+            </div>
+          </div>
+        </.form>
+      </div>
+    </div>
+  </div>
+<% end %>
 
 <!-- Group Members Modal -->
 <%= if @show_group_modal do %>
@@ -134,11 +220,10 @@
                       title="Edit Person"
                     >Edit</button>
                     <button
-                      phx-click="delete_node"
+                      phx-click="confirm_delete_node"
                       phx-value-node_id={member.id}
                       type="button"
                       class="text-xs px-2 py-1 bg-red-500 hover:bg-red-600 text-white rounded"
-                      onclick="return confirmDelete('Delete this person?')"
                       title="Delete Person"
                     >Delete</button>
                   </div>
@@ -167,10 +252,9 @@
             </button>
             <%= if @current_group_id do %>
               <button
-                phx-click="delete_node"
+                phx-click="confirm_delete_node"
                 phx-value-node_id={@current_group_id}
                 class="bg-red-600 hover:bg-red-700 text-white font-semibold px-6 py-3 rounded-xl shadow-md transition-colors duration-200"
-                onclick="return confirmDelete('Delete this group and all its sub-groups?')"
                 type="button"
               >
                 Delete Group
@@ -195,7 +279,7 @@
   <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
     <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-y-auto" phx-click-away="close_add_person_modal">
       <div class="p-6 border-b border-gray-200 flex items-center justify-between">
-        <h3 class="text-xl font-semibold text-gray-800">Add New Department/Team</h3>
+        <h3 class="text-xl font-semibold text-gray-800">Add new member to team</h3>
         <button phx-click="close_add_person_modal" class="text-gray-400 hover:text-gray-600 transition-colors duration-200 p-2 hover:bg-gray-100 rounded-full" type="button">
           <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
@@ -208,77 +292,6 @@
                 <%= @form_error %>
               </div>
             <% end %>
-
-<!-- Edit Group Modal -->
-<%= if @show_edit_group_modal do %>
-  <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-    <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-y-auto" phx-click-away="cancel_edit_group">
-      <div class="p-6 border-b border-gray-200 flex items-center justify-between">
-        <h3 class="text-xl font-semibold text-gray-800">Edit Group</h3>
-        <button phx-click="cancel_edit_group" class="text-gray-400 hover:text-gray-600 transition-colors duration-200 p-2 hover:bg-gray-100 rounded-full" type="button">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-          </svg>
-        </button>
-      </div>
-      <div class="p-6">
-        <.form for={%{}} phx-submit="save_edit_group" phx-change="update_edit_group_form">
-          <div class="space-y-4">
-            <div>
-              <label class="block text-gray-700 text-sm font-semibold mb-2">Group Name</label>
-              <input type="text" name="group[name]" value={@edit_group_data["name"]} class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all duration-200" />
-            </div>
-            <input type="hidden" name="group[node_id]" value={@edit_group_data["node_id"]} />
-            <div class="flex justify-end space-x-3 pt-2">
-              <button type="button" phx-click="cancel_edit_group" class="bg-gray-500 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-xl shadow-md transition-all duration-300">Cancel</button>
-              <button type="submit" class="bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-semibold py-2 px-4 rounded-xl shadow-md transition-all duration-300">Save</button>
-            </div>
-          </div>
-        </.form>
-      </div>
-    </div>
-  </div>
-<% end %>
-
-<!-- Edit Person Modal -->
-<%= if @show_edit_person_modal do %>
-  <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-    <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-y-auto" phx-click-away="cancel_edit">
-      <div class="p-6 border-b border-gray-200 flex items-center justify-between">
-        <h3 class="text-xl font-semibold text-gray-800">Edit Person</h3>
-        <button phx-click="cancel_edit" class="text-gray-400 hover:text-gray-600 transition-colors duration-200 p-2 hover:bg-gray-100 rounded-full" type="button">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-          </svg>
-        </button>
-      </div>
-      <div class="p-6">
-        <%= if @form_error do %>
-          <div class="mb-4 p-3 bg-red-100 border border-red-200 text-red-800 rounded-lg text-sm">
-            <%= @form_error %>
-          </div>
-        <% end %>
-        <.form for={%{}} phx-submit="update_node" phx-change="update_edit_form">
-          <div class="space-y-4">
-            <div>
-              <label class="block text-gray-700 text-sm font-semibold mb-2">Name</label>
-              <input type="text" name="edit_user[name]" value={@edit_form_data["name"]} class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all duration-200" />
-            </div>
-            <div>
-              <label class="block text-gray-700 text-sm font-semibold mb-2">Role</label>
-              <input type="text" name="edit_user[role]" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all duration-200" value={@edit_form_data["role"]} placeholder="Enter role/position" />
-            </div>
-            <input type="hidden" name="edit_user[node_id]" value={@edit_form_data["node_id"]} />
-            <div class="flex justify-end space-x-3 pt-2">
-              <button type="button" phx-click="cancel_edit" class="bg-gray-500 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-xl shadow-md transition-all duration-300">Cancel</button>
-              <button type="submit" class="bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-semibold py-2 px-4 rounded-xl shadow-md transition-all duration-300">Update</button>
-            </div>
-          </div>
-        </.form>
-      </div>
-    </div>
-  </div>
-<% end %>
             <.form for={%{}} phx-submit="add_user" phx-change="update_form">
               <div class="space-y-4">
                 <div>
@@ -304,7 +317,7 @@
                     <select name="user[reports_to]" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200" required>
                       <option value="" disabled selected={@form_data["reports_to"] in [nil, "", "--Select--"]}>-- Select Manager --</option>
                       <%= for option <- @dropdown_options do %>
-                        <option value={option.value} selected={@form_data["reports_to"] == option.value}>
+                        <option value={option.value} selected={to_string(@form_data["reports_to"]) == to_string(option.value)}>
                           <%= option.display %>
                         </option>
                       <% end %>
@@ -313,7 +326,7 @@
                 </div>
             <div class="flex justify-end space-x-3 pt-2">
               <button type="button" phx-click="close_add_person_modal" class="bg-gray-500 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-xl shadow-md transition-all duration-300">Cancel</button>
-              <button type="submit" class="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-semibold py-2 px-4 rounded-xl shadow-md transition-all duration-300">Add Department/Team</button>
+              <button type="submit" class="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-semibold py-2 px-4 rounded-xl shadow-md transition-all duration-300">Add Member</button>
                 </div>
               </div>
             </.form>
