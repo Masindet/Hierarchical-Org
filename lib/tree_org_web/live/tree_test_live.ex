@@ -787,8 +787,8 @@ defmodule TreeOrgWeb.TreeTestLive do
 
     # Lines from parent to current node (if not root)
     parent_lines = if parent_x && parent_level do
-      parent_y = parent_level * 150 + 75  # 150px per level + node center offset
-      current_y = current_level * 150 + 75
+      parent_y = parent_level * 220 + 110  # 220px per level + node center offset
+      current_y = current_level * 220 + 110
 
       [{parent_x, parent_y, current_x, current_y}]
     else
@@ -860,7 +860,7 @@ defmodule TreeOrgWeb.TreeTestLive do
     end
 
     container_width = max_x - min_x + 300
-    container_height = (max_level + 1) * 150 + 100
+    container_height = (max_level + 1) * 220 + 100
 
     # Pre-calculate members and subgroups for each node to avoid tuple rendering issues
     nodes_with_children = Enum.map(positioned_nodes, fn positioned_node ->
@@ -944,7 +944,7 @@ defmodule TreeOrgWeb.TreeTestLive do
             <div
               class="absolute z-20"
               id={"group-#{positioned_node.node.id}"}
-              style={"left: #{positioned_node.x - @min_x + 150}px; top: #{level * 150}px; transform: translateX(-50%);"}
+              style={"left: #{positioned_node.x - @min_x + 150}px; top: #{level * 220}px; transform: translateX(-50%);"}
             >
               <div class="relative group flex flex-col items-center">
                 <div
